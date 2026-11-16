@@ -1,0 +1,12 @@
+# 模型 = 架构族 + 检测头；权重文件名沿用官方命名（detect 无后缀，seg/pose/cls 带后缀）
+id: yolo11-detect
+family: yolo11
+head: detect
+label: YOLO11 · 目标检测
+tasks: [detect]
+role: trainable
+order: 10
+notes: YOLO11 系列（n/s/m/l/x），detect/segment/pose/classify 全覆盖。参数默认值即 ultralytics 默认。
+  检测头：输出框 + 类别，最通用的入口。
+weights:
+  detect: {n: yolo11n.pt, s: yolo11s.pt, m: yolo11m.pt, l: yolo11l.pt, x: yolo11x.pt}

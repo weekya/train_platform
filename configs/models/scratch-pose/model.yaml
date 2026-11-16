@@ -1,0 +1,12 @@
+# 模型 = 架构族 + 检测头；权重文件名沿用官方命名（detect 无后缀，seg/pose/cls 带后缀）
+id: scratch-pose
+family: scratch
+head: pose
+label: 从零训练（架构 yaml） · 姿态关键点
+tasks: [pose]
+role: trainable
+order: 42
+notes: 从零训练：直接用 ultralytics 内置架构 yaml，不加载预训练权重，参数与 YOLO11 一致。 姿态头：输出框 + 关键点（kpt_shape
+  由数据集决定）。
+weights:
+  pose: {n: yolo11n-pose.yaml, s: yolo11s-pose.yaml}

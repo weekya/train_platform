@@ -1,0 +1,5 @@
+# 本模型的参数差异（与 _common/params.yaml 合并；参数表会再按 head 过滤）
+override:
+- {key: epochs, default: 72, help: RT-DETR 官方配方常用 72 轮（注意力检测器收敛慢，通常不用 mosaic 辅助）。}
+extra: []
+unsupported: [mosaic, mixup, close_mosaic, rect, multi_scale]

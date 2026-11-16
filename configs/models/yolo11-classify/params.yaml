@@ -1,0 +1,4 @@
+# 本模型的参数差异（与 _common/params.yaml 合并；参数表会再按 head 过滤）
+override: []
+extra: []
+unsupported: []

@@ -1,0 +1,11 @@
+# 模型 = 架构族 + 检测头；权重文件名沿用官方命名（detect 无后缀，seg/pose/cls 带后缀）
+id: yolov8-detect
+family: yolov8
+head: detect
+label: YOLOv8 · 目标检测
+tasks: [detect]
+role: trainable
+order: 20
+notes: YOLOv8 系列，与 YOLO11 参数完全兼容（结构不同、训练参数一致）。 检测头：输出框 + 类别，最通用的入口。
+weights:
+  detect: {n: yolov8n.pt, s: yolov8s.pt, m: yolov8m.pt, l: yolov8l.pt, x: yolov8x.pt}

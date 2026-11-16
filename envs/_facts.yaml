@@ -1,0 +1,184 @@
+main_system:
+  facts:
+    python: 3.12.16
+    executable: /home/ygx/train_platform/envs/prefixes/main_system/bin/python3
+    prefix: /home/ygx/train_platform/envs/prefixes/main_system
+    machine: aarch64
+    packages:
+      torch: 2.10.0+cu130
+      torchvision: 0.25.0+cu130
+      ultralytics: 8.4.208
+      fastapi: 0.162.2
+      uvicorn: 0.54.0
+      cv2: 5.0.0
+      numpy: 2.5.4
+      PIL: 13.0.0
+      requests: 2.34.2
+      yaml: 6.0.3
+      matplotlib: 3.11.2
+    torch:
+      version: 2.10.0+cu130
+      cuda_available: true
+      arch_list:
+      - sm_80
+      - sm_90
+      - sm_100
+      - sm_110
+      - sm_120
+      - compute_120
+      cudnn: 91501
+    gpu:
+      name: NVIDIA GB10
+      capability: '12.1'
+      sm: sm_121
+      arch_supported: false
+    jiterator:
+      ok: true
+      error: ''
+    path: envs/prefixes/main_system
+    kind: conda-prefix
+    role: main
+    tags:
+    - default
+    - in-project
+    - web
+    probed_at: '2026-11-11T10:46:59+08:00'
+  verified_at: '2026-11-11T10:46:59+08:00'
+label_system:
+  facts:
+    python: 3.12.16
+    executable: /home/ygx/train_platform/envs/prefixes/label_system/bin/python3
+    prefix: /home/ygx/train_platform/envs/prefixes/label_system
+    machine: aarch64
+    packages:
+      torch: 2.10.0+cu130
+      torchvision: 0.25.0+cu130
+      ultralytics: 8.4.208
+      fastapi: 0.162.2
+      uvicorn: 0.54.0
+      cv2: 5.0.0
+      numpy: 2.5.4
+      PIL: 13.0.0
+      requests: 2.34.2
+      yaml: 6.0.3
+      matplotlib: 3.11.2
+    torch:
+      version: 2.10.0+cu130
+      cuda_available: true
+      arch_list:
+      - sm_80
+      - sm_90
+      - sm_100
+      - sm_110
+      - sm_120
+      - compute_120
+      cudnn: 91501
+    gpu:
+      name: NVIDIA GB10
+      capability: '12.1'
+      sm: sm_121
+      arch_supported: false
+    jiterator:
+      ok: true
+      error: ''
+    path: envs/prefixes/label_system
+    kind: conda-prefix
+    role: label
+    tags:
+    - in-project
+    - gpu
+    - labeling
+    probed_at: '2026-11-11T10:47:01+08:00'
+  verified_at: '2026-11-11T10:47:01+08:00'
+train_system:
+  facts:
+    python: 3.12.16
+    executable: /home/ygx/train_platform/envs/prefixes/train_system/bin/python3
+    prefix: /home/ygx/train_platform/envs/prefixes/train_system
+    machine: aarch64
+    packages:
+      torch: 2.10.0+cu130
+      torchvision: 0.25.0+cu130
+      ultralytics: 8.4.208
+      fastapi: 0.162.2
+      uvicorn: 0.54.0
+      cv2: 5.0.0
+      numpy: 2.5.4
+      PIL: 13.0.0
+      requests: 2.34.2
+      yaml: 6.0.3
+      matplotlib: 3.11.2
+    torch:
+      version: 2.10.0+cu130
+      cuda_available: true
+      arch_list:
+      - sm_80
+      - sm_90
+      - sm_100
+      - sm_110
+      - sm_120
+      - compute_120
+      cudnn: 91501
+    gpu:
+      name: NVIDIA GB10
+      capability: '12.1'
+      sm: sm_121
+      arch_supported: false
+    jiterator:
+      ok: true
+      error: ''
+    path: envs/prefixes/train_system
+    kind: conda-prefix
+    role: train
+    tags:
+    - in-project
+    - gpu
+    - training
+    probed_at: '2026-11-11T10:47:03+08:00'
+  verified_at: '2026-11-11T10:47:03+08:00'
+test_system:
+  facts:
+    python: 3.12.16
+    executable: /home/ygx/train_platform/envs/prefixes/test_system/bin/python3
+    prefix: /home/ygx/train_platform/envs/prefixes/test_system
+    machine: aarch64
+    packages:
+      torch: 2.10.0+cu130
+      torchvision: 0.25.0+cu130
+      ultralytics: 8.4.208
+      fastapi: 0.162.2
+      uvicorn: 0.54.0
+      cv2: 5.0.0
+      numpy: 2.5.4
+      PIL: 13.0.0
+      requests: 2.34.2
+      yaml: 6.0.3
+      matplotlib: 3.11.2
+    torch:
+      version: 2.10.0+cu130
+      cuda_available: true
+      arch_list:
+      - sm_80
+      - sm_90
+      - sm_100
+      - sm_110
+      - sm_120
+      - compute_120
+      cudnn: 91501
+    gpu:
+      name: NVIDIA GB10
+      capability: '12.1'
+      sm: sm_121
+      arch_supported: false
+    jiterator:
+      ok: true
+      error: ''
+    path: envs/prefixes/test_system
+    kind: conda-prefix
+    role: test
+    tags:
+    - in-project
+    - gpu
+    - evaluation
+    probed_at: '2026-11-11T10:47:04+08:00'
+  verified_at: '2026-11-11T10:47:04+08:00'

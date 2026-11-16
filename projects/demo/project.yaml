@@ -1,0 +1,37 @@
+id: demo
+name: 检测演示
+description: ''
+task: detect
+classes:
+- red
+- green
+- blue
+kpt_shape:
+- 17
+- 3
+image_format: ''
+created_at: '2026-11-11T10:31:45+08:00'
+updated_at: '2026-11-11T10:57:34+08:00'
+defaults: {}
+vlm: {}
+eval_presets:
+- id: ep-691e0ec2
+  name: 标准 val（imgsz 320）
+  split: val
+  params:
+    imgsz: 320
+    conf: 0.25
+    iou: 0.7
+    device: auto
+  note: ''
+  created_at: '2026-11-11T10:57:34+08:00'
+- id: ep-9efd222e
+  name: 高召回（conf 0.5）
+  split: test
+  params:
+    imgsz: 320
+    conf: 0.5
+    iou: 0.5
+    device: auto
+  note: ''
+  created_at: '2026-11-11T10:57:34+08:00'

@@ -1,0 +1,11 @@
+# 模型 = 架构族 + 检测头；权重文件名沿用官方命名（detect 无后缀，seg/pose/cls 带后缀）
+id: scratch-classify
+family: scratch
+head: classify
+label: 从零训练（架构 yaml） · 图像分类
+tasks: [classify]
+role: trainable
+order: 43
+notes: 从零训练：直接用 ultralytics 内置架构 yaml，不加载预训练权重，参数与 YOLO11 一致。 分类头：输出整图类别，不做定位，增强与检测头不同。
+weights:
+  classify: {n: yolo11n-cls.yaml, s: yolo11s-cls.yaml}

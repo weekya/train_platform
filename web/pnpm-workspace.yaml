@@ -1,0 +1,6 @@
+allowBuilds:
+  esbuild: set this to true or false
+# pnpm 11 起，构建脚本白名单放在 pnpm-workspace.yaml
+# （esbuild 需要跑 postinstall 才能装上平台二进制）
+onlyBuiltDependencies:
+  - esbuild

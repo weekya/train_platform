@@ -1,0 +1,12 @@
+# 模型 = 架构族 + 检测头；权重文件名沿用官方命名（detect 无后缀，seg/pose/cls 带后缀）
+id: rtdetr-detect
+family: rtdetr
+head: detect
+label: RT-DETR（检测）
+tasks: [detect]
+role: trainable
+order: 30
+notes: RT-DETR 是 Transformer 检测器：不支持 Mosaic/rect 等 CNN 式增强，官方配方常用 72 轮。 检测头：输出框 +
+  类别，最通用的入口。
+weights:
+  detect: {l: rtdetr-l.pt, x: rtdetr-x.pt}

@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# ============================================================================
+# 统一入口：bin/tp <命令>
+#
+#   bin/tp project list
+#   bin/tp dataset upload -p <项目> --dataset <数据集> ./images/
+#   bin/tp label run -p <项目> --dataset <数据集> --type yolo --weights yolo11n.pt
+#   bin/tp train run -p <项目> --dataset <数据集> --model yolo11s.pt --epochs 100
+#   bin/tp eval  run -p <项目> --dataset <数据集> --weights <模型 id>
+#   bin/tp env list / env probe / env doctor
+#   bin/tp job list / job log <id> / job cancel <id>
+#
+# 解释器：优先 envs/.default_python（main_system 环境），找不到才退回 python3。
+# 三条环境变量保证"整个目录拷走就能跑"：
+#   PYTHONNOUSERSITE=1        —— 不加载 ~/.local 里的包
+#   PYTHONPATH=<root>/src     —— 零安装
+#   YOLO_CONFIG_DIR=<root>/state/.yolo —— ultralytics 全局状态不落到 ~/.config
+# ============================================================================
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export PYTHONPATH="$HERE/src${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONNOUSERSITE=1
+export MLPLATFORM_ROOT="$HERE"
+export YOLO_CONFIG_DIR="${YOLO_CONFIG_DIR:-$HERE/state/.yolo}"
+
+pick_python() {
+  if [ -n "${TP_PYTHON:-}" ] && [ -x "${TP_PYTHON}" ]; then
+    printf '%s' "${TP_PYTHON}"
+    return 0
+  fi
+  if [ -f "$HERE/envs/.default_python" ]; then
+    local rel
+    rel="$(head -n1 "$HERE/envs/.default_python" | tr -d '[:space:]')"
+    if [ -x "$HERE/$rel" ]; then
+      printf '%s' "$HERE/$rel"
+      return 0
+    fi
+    echo "[warn] envs/.default_python 指向的解释器不存在: $rel（回退系统 python3）" >&2
+  fi
+  printf '%s' "python3"
+}
+
+exec "$(pick_python)" -m mlplatform.cli "$@"

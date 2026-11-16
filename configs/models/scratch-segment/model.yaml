@@ -1,0 +1,12 @@
+# 模型 = 架构族 + 检测头；权重文件名沿用官方命名（detect 无后缀，seg/pose/cls 带后缀）
+id: scratch-segment
+family: scratch
+head: segment
+label: 从零训练（架构 yaml） · 实例分割
+tasks: [segment]
+role: trainable
+order: 41
+notes: 从零训练：直接用 ultralytics 内置架构 yaml，不加载预训练权重，参数与 YOLO11 一致。 分割头：在检测头基础上多一个 mask
+  分支（输出多边形/掩码）。
+weights:
+  segment: {n: yolo11n-seg.yaml, s: yolo11s-seg.yaml, m: yolo11m-seg.yaml}

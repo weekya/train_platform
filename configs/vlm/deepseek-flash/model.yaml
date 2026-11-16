@@ -1,0 +1,12 @@
+# VLM 模型目录：一个模型一个目录；提示词在同目录 prompts.yaml
+id: deepseek-flash
+label: DeepSeek Flash（视觉）
+provider: deepseek
+base_url: https://api.deepseek.com/v1
+model: deepseek-flash
+api_key_env: DEEPSEEK_API_KEY
+vision: true
+notes: DeepSeek 官方 API 中 deepseek-flash 支持图片输入；推理过程会消耗 token（约 1000~2000/张）。
+defaults: {temperature: 0.1, max_tokens: 3000, timeout: 180, concurrency: 4, rate_limit_per_min: 0,
+  json_mode: true, max_side: 1600, image_detail: ''}
+order: 10

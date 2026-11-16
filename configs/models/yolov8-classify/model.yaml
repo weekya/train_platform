@@ -1,0 +1,11 @@
+# 模型 = 架构族 + 检测头；权重文件名沿用官方命名（detect 无后缀，seg/pose/cls 带后缀）
+id: yolov8-classify
+family: yolov8
+head: classify
+label: YOLOv8 · 图像分类
+tasks: [classify]
+role: trainable
+order: 23
+notes: YOLOv8 系列，与 YOLO11 参数完全兼容（结构不同、训练参数一致）。 分类头：输出整图类别，不做定位，增强与检测头不同。
+weights:
+  classify: {n: yolov8n-cls.pt, s: yolov8s-cls.pt}

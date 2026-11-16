@@ -1,0 +1,11 @@
+# 模型 = 架构族 + 检测头；权重文件名沿用官方命名（detect 无后缀，seg/pose/cls 带后缀）
+id: yolov8-pose
+family: yolov8
+head: pose
+label: YOLOv8 · 姿态关键点
+tasks: [pose]
+role: trainable
+order: 22
+notes: YOLOv8 系列，与 YOLO11 参数完全兼容（结构不同、训练参数一致）。 姿态头：输出框 + 关键点（kpt_shape 由数据集决定）。
+weights:
+  pose: {n: yolov8n-pose.pt, s: yolov8s-pose.pt, m: yolov8m-pose.pt, l: yolov8l-pose.pt}

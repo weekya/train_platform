@@ -1,0 +1,13 @@
+# 模型 = 架构族 + 检测头；权重文件名沿用官方命名（detect 无后缀，seg/pose/cls 带后缀）
+id: yolo11-segment
+family: yolo11
+head: segment
+label: YOLO11 · 实例分割
+tasks: [segment]
+role: trainable
+order: 11
+notes: YOLO11 系列（n/s/m/l/x），detect/segment/pose/classify 全覆盖。参数默认值即 ultralytics 默认。
+  分割头：在检测头基础上多一个 mask 分支（输出多边形/掩码）。
+weights:
+  segment: {n: yolo11n-seg.pt, s: yolo11s-seg.pt, m: yolo11m-seg.pt, l: yolo11l-seg.pt,
+    x: yolo11x-seg.pt}

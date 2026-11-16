@@ -1,0 +1,162 @@
+# ============================================================================
+# 通用训练参数：所有模型都继承这里的定义（说明 / 默认值 / 范围 / 适用任务）。
+#
+# 这里放 ultralytics 训练器对 YOLO11 / YOLOv8 / RT-DETR 都通用的超参。
+# 某个模型要改默认值、补特有参数、或声明不支持某参数，写在自己的 params.yaml 里：
+#
+#   configs/models/<模型目录>/params.yaml
+#     override:    [{key: epochs, default: 72}]       # 改默认值/说明/范围
+#     extra:       [{key: xxx, label: ..., default: ...}]  # 本模型独有参数
+#     unsupported: [mosaic, mixup]                    # 本模型不支持，界面隐藏、后端拒绝
+# ============================================================================
+
+- {key: epochs, label: 训练轮数, type: int, default: 100, min: 1, max: 100000, help: 训练总轮数。每轮结束都会在验证集上算一次指标，配合
+    patience 可早停。}
+- {key: imgsz, label: 输入尺寸, type: int, default: 640, min: 32, max: 4096, align: 32,
+  help: 训练输入尺寸（letterbox 等比缩放+补边，不变形）。尽量接近实际部署分辨率；大图小目标建议先按 imagz 裁减，而不是把 imgsz 调得很大。}
+- {key: batch, label: 批大小, type: int, default: 16, min: -1, max: 1024, help: 每批图片数。-1
+    = AutoBatch（按显存自动选）。显存不足时优先调小这个或 imgsz。}
+- {key: workers, label: 数据线程, type: int, default: 8, min: 0, max: 64, help: 数据加载线程数。受限容器里信号量不可用时，平台会自动强制为
+    0（串行加载，慢但能跑）。}
+- {key: device, label: 设备, type: str, default: auto, help: 'auto / 0 / 0,1 / cpu。开始前平台会探测该
+    GPU 是否支持当前 torch 的 JIT，不通过会自动降级 CPU 并写日志。'}
+- {key: optimizer, label: 优化器, type: str, default: auto, help: auto / SGD / Adam /
+    AdamW / NAdam / RAdam / ...。auto 会按训练轮数自动选择。}
+- {key: lr0, label: 初始学习率, type: float, default: 0.01, min: 0.0, max: 10.0, step: 0.001,
+  help: 初始学习率。SGD 通常 0.01 左右，AdamW 通常 0.001 左右。}
+- {key: lrf, label: 最终学习率系数, type: float, default: 0.01, min: 0.0, max: 1.0, step: 0.001,
+  help: 最终学习率 = lr0 × lrf，是学习率衰减的终点系数。}
+- {key: momentum, label: 动量, type: float, default: 0.937, min: 0.0, max: 1.0, step: 0.001,
+  help: SGD 动量（Adam 系列里对应 beta1）。}
+- {key: weight_decay, label: 权重衰减, type: float, default: 0.0005, min: 0.0, max: 1.0,
+  step: 0.0001, help: 权重衰减（L2 正则），抑制过拟合。}
+- {key: warmup_epochs, label: 预热轮数, type: float, default: 3.0, min: 0.0, max: 100.0,
+  step: 0.5, help: 学习率预热轮数：前几轮从 0 线性升到 lr0，让训练更稳定。}
+- {key: patience, label: 早停耐心值, type: int, default: 50, min: 0, max: 10000, help: 验证指标连续
+    N 轮不提升就停止训练。0 = 不早停。}
+- {key: cos_lr, label: 余弦学习率, type: bool, default: false, help: 使用余弦学习率调度（默认线性衰减）。}
+- {key: close_mosaic, label: 关闭 mosaic 的轮数, type: int, default: 10, min: 0, max: 100,
+  help: 最后 N 轮关闭 Mosaic 增强，让模型在更接近真实分布的图上收尾。}
+- {key: cache, label: 缓存数据, type: str, default: false, help: false / true / ram /
+    disk。小数据集用 ram 能显著提速，代价是内存占用。}
+- {key: amp, label: 混合精度, type: bool, default: true, help: AMP 混合精度训练：省显存、提速。出现 NaN/不稳定时可关闭。}
+- {key: seed, label: 随机种子, type: int, default: 0, min: 0, max: 2147483647, help: 随机种子。固定后数据增强顺序可复现。}
+- {key: deterministic, label: 确定性训练, type: bool, default: true, help: 尽量让结果可复现（更慢）。关闭后每次训练会有差异。}
+- {key: single_cls, label: 单类训练, type: bool, default: false, help: 把所有类别合并成第 0 类训练（只关心“有没有目标”时用）。}
+- {key: rect, label: 矩形训练, type: bool, default: false, help: 矩形训练：减少 letterbox 补边、提速；但会削弱随机裁剪类增强。部分架构（如
+    RT-DETR）不支持。}
+- {key: resume, label: 断点续训, type: bool, default: false, help: 从该训练记录上次的 weights/last.pt
+    继续训练。}
+- {key: freeze, label: 冻结层数, type: int, default: 0, min: 0, max: 1000, help: 冻结主干前
+    N 层（迁移学习常用）。0 = 不冻结。}
+- {key: dropout, label: dropout, type: float, default: 0.0, min: 0.0, max: 1.0, step: 0.01,
+  help: 分类头 dropout 概率，仅对部分模型/任务生效。}
+- {key: pretrained, label: 预训练权重, type: bool, default: true, help: 是否加载预训练权重。选“从零训练（架构
+    yaml）”时会自动关闭。}
+- {key: val, label: 训练中验证, type: bool, default: true, help: 每个 epoch 后是否跑验证。关闭后没有指标曲线、无法早停、也选不出
+    best.pt。}
+- {key: plots, label: 训练曲线图, type: bool, default: true, help: 是否生成训练曲线/混淆矩阵等可视化图。}
+- {key: save_period, label: 定期保存周期, type: int, default: -1, min: -1, max: 10000, help: 每隔多少轮额外保存一次权重。-1
+    = 只保存 best/last。}
+- {key: box, label: 框损失权重, type: float, default: 7.5, min: 0.0, max: 100.0, step: 0.1,
+  help: 边界框回归损失权重（检测/分割/pose 通用）。}
+- {key: cls, label: 分类损失权重, type: float, default: 0.5, min: 0.0, max: 100.0, step: 0.1,
+  help: 分类损失权重。}
+- {key: dfl, label: DFL 损失权重, type: float, default: 1.5, min: 0.0, max: 100.0, step: 0.1,
+  help: Distribution Focal Loss 权重（YOLO 系列检测头）。}
+- {key: label_smoothing, label: 标签平滑, type: float, default: 0.0, min: 0.0, max: 1.0,
+  step: 0.01, help: 标签平滑系数，缓解过拟合/过度自信。}
+- {key: nbs, label: 名义批大小, type: int, default: 64, min: 1, max: 4096, help: 计算损失时的名义批大小（与
+    batch 解耦，用于梯度累积式的损失归一化）。}
+- {key: multi_scale, label: 多尺度训练, type: float, default: 0.0, min: 0.0, max: 1.0,
+  step: 0.05, help: 多尺度训练幅度：每批随机在 imgsz×(1±multi_scale) 内变化。部分架构不支持。}
+- key: overlap_mask
+  label: 重叠掩码
+  type: bool
+  default: true
+  tasks: [segment]
+  help: 分割任务：是否允许实例掩码重叠（关闭后重叠区域按 NMS 裁剪）。
+- key: mask_ratio
+  label: 掩码下采样比
+  type: int
+  default: 4
+  min: 1
+  max: 8
+  tasks: [segment]
+  help: 分割任务：mask 分支相对输入的下采样倍数（越大越省显存、越粗）。
+- key: copy_paste
+  label: CopyPaste
+  type: float
+  default: 0.0
+  min: 0.0
+  max: 1.0
+  step: 0.01
+  group: augment
+  tasks: [segment]
+  help: Copy-Paste 增强：把其它图的实例掩码粘贴进来，主要对分割任务有效。
+- key: pose
+  label: 关键点损失权重
+  type: float
+  default: 12.0
+  min: 0.0
+  max: 100.0
+  step: 0.1
+  tasks: [pose]
+  help: pose 任务：关键点回归损失权重。
+- key: kobj
+  label: 关键点置信权重
+  type: float
+  default: 1.0
+  min: 0.0
+  max: 100.0
+  step: 0.1
+  tasks: [pose]
+  help: pose 任务：关键点可见性（置信度）损失权重。
+- key: auto_augment
+  label: 自动增强策略
+  type: str
+  default: randaugment
+  tasks: [classify]
+  help: 分类任务：自动增强策略（randaugment / autoaugment / augmix）。
+- key: erasing
+  label: 随机擦除
+  type: float
+  default: 0.4
+  min: 0.0
+  max: 1.0
+  step: 0.05
+  tasks: [classify]
+  help: 分类任务：随机擦除图像区域，防止模型只依赖局部特征。
+- key: crop_fraction
+  label: 裁剪比例
+  type: float
+  default: 1.0
+  min: 0.1
+  max: 1.0
+  step: 0.05
+  tasks: [classify]
+  help: 分类任务：训练时中心裁剪比例（1.0 = 不裁剪）。
+- {key: hsv_h, label: 色调增强, type: float, default: 0.015, min: 0.0, max: 1.0, step: 0.001,
+  group: augment, help: HSV 色调抖动幅度，0 = 关闭。}
+- {key: hsv_s, label: 饱和度增强, type: float, default: 0.7, min: 0.0, max: 1.0, step: 0.01,
+  group: augment, help: HSV 饱和度抖动幅度。}
+- {key: hsv_v, label: 亮度增强, type: float, default: 0.4, min: 0.0, max: 1.0, step: 0.01,
+  group: augment, help: HSV 亮度抖动幅度（模拟光照变化）。}
+- {key: degrees, label: 旋转角度, type: float, default: 0.0, min: -180.0, max: 180.0,
+  group: augment, help: 随机旋转角度 ±。目标有明确朝向时不要开太大。}
+- {key: translate, label: 平移比例, type: float, default: 0.1, min: 0.0, max: 1.0, step: 0.01,
+  group: augment, help: 随机平移幅度（相对图片尺寸的比例）。}
+- {key: scale, label: 缩放比例, type: float, default: 0.5, min: 0.0, max: 1.0, step: 0.01,
+  group: augment, help: 随机缩放幅度 ±。小目标场景不要开太大，否则目标会更小。}
+- {key: shear, label: 错切, type: float, default: 0.0, min: -45.0, max: 45.0, group: augment,
+  help: 随机错切角度 ±。}
+- {key: perspective, label: 透视变换, type: float, default: 0.0, min: 0.0, max: 0.001,
+  step: 0.0001, group: augment, help: 透视变换强度，0 = 关闭（模拟视角变化）。}
+- {key: flipud, label: 上下翻转, type: float, default: 0.0, min: 0.0, max: 1.0, step: 0.01,
+  group: augment, help: 上下翻转概率。语义上不合理的场景（如地面目标）不要开。}
+- {key: fliplr, label: 左右翻转, type: float, default: 0.5, min: 0.0, max: 1.0, step: 0.01,
+  group: augment, help: 左右翻转概率，0.5 是常见默认值。}
+- {key: mosaic, label: Mosaic, type: float, default: 1.0, min: 0.0, max: 1.0, step: 0.01,
+  group: augment, help: Mosaic 四图拼接概率。对小目标友好，但会改变目标的相对尺度；部分架构不支持。}
+- {key: mixup, label: MixUp, type: float, default: 0.0, min: 0.0, max: 1.0, step: 0.01,
+  group: augment, help: MixUp 两图混合概率。检测/分割任务一般不用或很小。}

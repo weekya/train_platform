@@ -1,0 +1,49 @@
+# 不进 git 的东西：数据本体、权重、环境实体、运行时产物
+# （项目目录本身可以整目录拷走备份，这里只是决定哪些内容适合进版本库）
+
+# ---- 环境实体（几 GB，可由 envs/recipes 重建）----
+envs/prefixes/
+envs/.default_python
+
+# ---- 预训练权重（按需下载 / 手工放入）----
+weights/pretrained/*.pt
+
+# ---- 项目里的数据与产物（体积大、可重建）----
+#    只保留项目元信息和启停脚本，data/model/记录都不进 git
+projects/*/datasets/
+projects/*/models/
+projects/*/trainings/
+projects/*/evaluations/
+projects/*/jobs/
+projects/*/state/
+!projects/*/datasets/.gitkeep
+!projects/*/models/.gitkeep
+!projects/*/trainings/.gitkeep
+!projects/*/evaluations/.gitkeep
+
+# ---- 平台运行时 ----
+state/
+# 全局日志（running_time/log/<组件>/...）
+running_time/
+*.part
+*.log
+
+# ---- v1 归档（仅本机参考）----
+legacy/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# ---- 前端 ----
+web/node_modules/
+web/dist/
+web/.vite/
+web/pnpm-debug.log
+.pnpm-store/
+
+# ---- 杂项 ----
+.DS_Store
+*.swp

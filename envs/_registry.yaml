@@ -1,0 +1,60 @@
+# ============================================================================
+# 环境注册表（人工维护）
+#
+# 规矩：
+#   1. **只登记 envs/prefixes/ 下的环境**——环境实体随项目目录一起迁移。
+#   2. 四个角色各一个环境：
+#        main_system    启动整个系统（Web 服务 / CLI / 调度器）
+#        label_system   自动标注 + 数据生成（detect / sam / pose / VLM）
+#        train_system   模型训练
+#        test_system    模型评估 + 检测测试
+#   3. 名字只表达身份；能力（torch/cuda/GPU）由 `bin/tp env probe` 实测写进 _facts.yaml。
+#
+# 建环境（已在 envs/prefixes/ 下建好；换机器/重建时执行）：
+#     bash envs/recipes/main_system.sh     # 母本（含 fastapi/uvicorn）
+#     bash envs/recipes/label_system.sh    # 由母本克隆
+#     bash envs/recipes/train_system.sh
+#     bash envs/recipes/test_system.sh
+# 实测：克隆一个环境约 25 秒（conda create --clone），四个环境合计约 21GB 磁盘。
+# ============================================================================
+version: 2
+
+default_env: main_system
+
+conda:
+  # 建环境用的 conda base（只用于创建/克隆，运行时直接调用环境里的 python，不需要激活）
+  bases:
+    - /opt/robot/model-service/miniconda3
+
+envs:
+  main_system:
+    kind: conda-prefix
+    path: envs/prefixes/main_system
+    role: main
+    description: 启动整个系统（FastAPI + 调度器 + CLI），也是所有环境不可用时的兜底
+    recipe: envs/recipes/main_system.sh
+    tags: [default, in-project, web]
+
+  label_system:
+    kind: conda-prefix
+    path: envs/prefixes/label_system
+    role: label
+    description: 自动标注与数据生成：detect / pose 本地权重、SAM 细化、VLM 调用、imgz 自适应裁减
+    recipe: envs/recipes/label_system.sh
+    tags: [in-project, gpu, labeling]
+
+  train_system:
+    kind: conda-prefix
+    path: envs/prefixes/train_system
+    role: train
+    description: 模型训练（ultralytics + torch），由调度器按作业类型自动选择
+    recipe: envs/recipes/train_system.sh
+    tags: [in-project, gpu, training]
+
+  test_system:
+    kind: conda-prefix
+    path: envs/prefixes/test_system
+    role: test
+    description: 模型评估与检测测试（mAP/PR 曲线/混淆矩阵/预测可视化）
+    recipe: envs/recipes/test_system.sh
+    tags: [in-project, gpu, evaluation]

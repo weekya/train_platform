@@ -1,0 +1,5 @@
+# 本模型的参数差异（与 _common/params.yaml 合并；参数表会再按 head 过滤）
+override:
+- {key: pretrained, default: false, help: 从零训练默认不加载预训练权重（选的是架构 yaml 而不是 .pt）。}
+extra: []
+unsupported: []

@@ -1,0 +1,11 @@
+# 模型 = 架构族 + 检测头；权重文件名沿用官方命名（detect 无后缀，seg/pose/cls 带后缀）
+id: yolov8-segment
+family: yolov8
+head: segment
+label: YOLOv8 · 实例分割
+tasks: [segment]
+role: trainable
+order: 21
+notes: YOLOv8 系列，与 YOLO11 参数完全兼容（结构不同、训练参数一致）。 分割头：在检测头基础上多一个 mask 分支（输出多边形/掩码）。
+weights:
+  segment: {n: yolov8n-seg.pt, s: yolov8s-seg.pt, m: yolov8m-seg.pt, l: yolov8l-seg.pt}

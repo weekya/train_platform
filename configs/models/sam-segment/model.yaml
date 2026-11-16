@@ -1,0 +1,13 @@
+# 模型 = 架构族 + 检测头；权重文件名沿用官方命名（detect 无后缀，seg/pose/cls 带后缀）
+id: sam-segment
+family: sam
+head: segment
+label: SAM / SAM2 / FastSAM（提示分割）
+tasks: [segment]
+role: segmenter
+order: 51
+notes: SAM/SAM2/FastSAM 是标注阶段的提示分割器，不参与训练，因此没有训练参数。 分割头：在检测头基础上多一个 mask 分支（输出多边形/掩码）。
+weights:
+  segment: {sam2-t: sam2.1_t.pt, sam2-s: sam2.1_s.pt, sam2-b: sam2.1_b.pt, fastsam-s: FastSAM-s.pt,
+    fastsam-x: FastSAM-x.pt, sam-vit-b: sam_b.pt, sam-vit-l: sam_l.pt}
+labeler: true

@@ -1,0 +1,160 @@
+# ============================================================================
+# 平台配置（所有阶段共用：Web / 自动标注 / 训练 / 评估）
+#
+# 修改后无需重启即可生效的项：大多数运行时读取的默认值（每次作业开始时读取）。
+# 需要重启的项：platform.web.host / port（监听地址在进程启动时确定）。
+# ============================================================================
+platform:
+  name: mlplatform
+
+  web:
+    host: 127.0.0.1          # 对外暴露请改成 0.0.0.0 并设置 token
+    port: 8600
+    token: ""                 # 非空时所有接口要求 Bearer token
+    start_timeout: 90
+    stop_grace: 15
+    max_upload_mb: 512        # 单张上传图片上限
+
+  runner:                     # 项目作业调度器
+    concurrency: 1            # 同一项目同时执行的作业数（一张 GPU 建议 1）
+    auto_start: true          # 有作业排队时自动拉起调度器
+    poll_seconds: 1.0
+    stop_jobs_on_exit: true
+
+  images:
+    # 所有上传图片统一转成这一种格式（jpg | png | webp）
+    format: jpg
+    quality: 95
+    max_side: 0               # >0 时等比缩放（绝不拉伸），0 = 保持原始分辨率
+    thumbnail: 420
+    allowed_exts: [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff",
+                   ".gif", ".jfif", ".ppm", ".pgm"]
+
+  labeling:
+    default_imgsz: 640        # 推理分辨率（不影响数据集图片本身的分辨率）
+    default_conf: 0.25
+    default_iou: 0.7
+    default_max_det: 300
+    preview: true             # 自动生成带标注的预览图
+    preview_max_side: 1400
+    batch: 16                 # 批量推理的批大小
+
+  tiling:                     # imgz 自适应裁减默认参数
+    enabled: true
+    default_imgsz: 640
+    overlap: 0.2              # 相邻窗口重叠比例
+    min_contain: 0.6          # 目标被窗口保留的最小比例（低于则丢弃该标注）
+    max_tile: 1536            # 窗口上限（目标比 imagz 大时放大窗口，最多到这里）
+    align: 32                 # 窗口尺寸对齐（训练尺寸通常是 32 的倍数）
+    oversize: expand          # expand（放大窗口）| downscale（整图等比缩放）| skip（跳过）
+    pad_to_tile: false        # 是否把裁减结果补边到正方形 imagz
+    min_tile: 64
+
+  training:
+    default_model: yolo11n.pt
+    epochs: 100
+    batch: 16
+    imgsz: 640
+    device: "0"               # auto / 0 / 0,1 / cpu
+    workers: 8
+    patience: 50
+    optimizer: auto
+    cache: false
+    val_ratio_when_no_split: 0.2
+
+  evaluation:
+    default_imgsz: 640
+    conf: 0.25                # 预测可视化阈值（mAP 计算固定用 0.001）
+    iou: 0.7
+    max_det: 300
+    predict_sample: 60        # 生成多少张预测可视化图片
+
+  envs:                       # 各阶段默认环境（名称对应 envs/_registry.yaml）
+    main: main_system
+    label: label_system
+    train: train_system
+    test: test_system
+
+  # VLM 自动标注：只调用**线上** OpenAI 兼容视觉接口（模型在服务商侧推理，本机不跑模型）
+  #
+  # 模型目录：configs/vlm/<模型>/（model.yaml + prompts.yaml），当前内置 deepseek-flash。
+  # 新增模型请按 configs/vlm/README.md 复制目录，无需改代码。
+  # vlm.model_id 留空 = 用目录里 order 最靠前的视觉模型（当前 deepseek-flash）。
+  #
+  # Key 优先从环境变量读（不落盘、不进 git）：
+  #   export DEEPSEEK_API_KEY=sk-xxxx      # 然后重启 ./start.sh
+  #
+  vlm:
+    # 留空 = 用 configs/vlm/ 里 order 最靠前的视觉模型（当前是 deepseek-flash）
+    # 也可以填模型目录 id，例如 deepseek-flash
+    model_id: ""
+    provider: ""
+    base_url: ""
+    model: ""
+    api_key: ""               # 不推荐写在这里；用环境变量
+    api_key_env: ""           # 指定读哪个环境变量，留空按模型目录的 api_key_env 自动找
+    temperature: 0.1
+    max_tokens: 2048
+    timeout: 120              # 单次请求超时（秒）
+    retries: 3                # 429/5xx/网络异常的重试次数（指数退避）
+    concurrency: 4            # 图片之间的并发数（线上接口按 QPS 限流时调小）
+    rate_limit_per_min: 0     # >0 时按每分钟请求数硬节流
+    json_mode: true           # 请求里带 response_format={"type":"json_object"}
+    image_detail: ""          # OpenAI 系可选 low/high/auto，low 更省 token
+    max_side: 1600            # 发送前把图片等比缩到最长边（减少 token 与延迟）
+    prompt: ""                # 自定义提示词模板，占位符：{width} {height} {classes} {task}
+
+  # ==========================================================================
+  # 全局日志：按组件分目录，每个组件目录下再分 高频(high) / 低频(low)
+  #
+  #   running_time/log/<组件>/high/<组件>[-<scope>]-<pid>.log   高频：会刷屏的明细
+  #   running_time/log/<组件>/low/<组件>[-<scope>]-<pid>.log    低频：生命周期 + 告警
+  #
+  #   组件 = web / runner / job / cli（哪一类进程）
+  #   scope = 同类进程里的哪个实例（项目 id、作业 id）
+  #   pid   = 进程号（RotatingFileHandler 不是多进程安全的，一个进程一个文件）
+  #
+  # 高频 vs 低频不是按级别分，而是按"会不会刷屏"：
+  #   high = HTTP 访问日志、逐张图片标注结果、逐轮 epoch 指标     → 小文件、少备份、短保留
+  #   low  = 进程启停、作业生命周期、参数快照、告警与异常          → 大文件、多备份、长保留
+  # 两条保证：WARNING 及以上永远同时进 low；高频明细一律 DEBUG（控制台看不见）。
+  #
+  # code：src/mlplatform/logs.py    文档：docs/LOGGING.md
+  # ==========================================================================
+  logging:
+    dir: running_time/log     # 日志总目录（相对项目根；绝对路径也接受）
+    level: INFO               # 全局默认级别：DEBUG / INFO / WARNING / ERROR / CRITICAL
+    console: true             # 输出到 stderr（stdout 留给 CLI 的表格/JSON）
+    console_level: INFO       # 控制台级别（高频明细是 DEBUG，所以默认不会刷屏）
+    file: true                # 写文件
+    file_level: DEBUG         # 两个文件的默认级别
+    split: true               # true = 组件目录下再分 high/ 与 low/；false = 合并成一个文件
+    per_process: true         # 一个进程一个文件（pid 进文件名）；多进程必须开着
+
+    # ---- 两个通道共用的轮转默认值（下面 high/low 可各自覆盖）----
+    rotation: size            # size（按大小）| daily（按天）| none（不轮转）
+    max_bytes: 5242880        # 5MB
+    backup_count: 3
+    when: midnight            # rotation=daily 时的切分点
+    retention_days: 7
+
+    high:                     # 高频通道：体量大、价值密度低
+      enabled: true
+      max_bytes: 5242880      # 5MB 一个
+      backup_count: 3
+      retention_days: 3       # 只留 3 天
+
+    low:                      # 低频通道：体量小、都是要留的证据
+      enabled: true
+      max_bytes: 10485760     # 10MB 一个
+      backup_count: 10
+      retention_days: 30      # 留 30 天
+
+    # 额外声明为高频的 logger 名（内置：uvicorn.access / web.access / job.detail）
+    high_loggers: []
+
+    latest_link: true         # 维护 <组件>.log 软链指向当前进程文件（方便 tail -f）
+    excepthook: true          # 未捕获异常也进日志
+    levels: {}                # 按组件覆盖级别，例如 {web: DEBUG, runner: INFO}
+    format: "%(asctime)s %(levelname)-7s [%(component)s]%(ctx)s %(message)s"
+    date_format: "%Y-%m-%d %H:%M:%S"

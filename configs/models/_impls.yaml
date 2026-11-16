@@ -1,0 +1,55 @@
+# ============================================================================
+# 模型实现映射：模型 id -> 实现代码
+#
+# 规则（这三条是"加模型不改共享代码"的基础）：
+#   1. **显式**：不靠文件名推断，不靠 yolo/sam/vlm 这种类型字符串分叉；
+#   2. **一个模型一个文件**：src/mlplatform/impl/<模块>.py，差异只写在自己的文件里；
+#      同框架的公共部分在 src/mlplatform/impl/framework/<框架>.py，模型文件通常十几行；
+#   3. **严格校验**：configs/models/<id>/ 存在但这里没登记、或登记的模块导入失败，
+#      `bin/tp doctor` 会直接列出来（绝不静默退回某个默认实现）。
+#
+# 加一个模型的步骤：
+#   1. 建 configs/models/<模型 id>/{model.yaml,params.yaml}
+#   2. 建 src/mlplatform/impl/<模块>.py（继承 framework 里对应基类，声明 model_id/tasks/capabilities）
+#   3. 在下面 impls 里加一行
+#   4.（可选）跑 `bin/tp doctor` 确认映射自检通过
+#
+# virtual: true = 没有 configs/models 目录的实现（例如线上 VLM，配置在 configs/vlm/）
+# ============================================================================
+version: 1
+
+impls:
+  # ---- YOLO11 系（ultralytics，四个检测头各自独立文件）----
+  yolo11-detect:   { module: yolo11_detect,    cls: Backend }
+  yolo11-segment:  { module: yolo11_segment,   cls: Backend }
+  yolo11-pose:     { module: yolo11_pose,      cls: Backend }
+  yolo11-classify: { module: yolo11_classify,  cls: Backend }
+
+  # ---- YOLOv8 系 ----
+  yolov8-detect:   { module: yolov8_detect,    cls: Backend }
+  yolov8-segment:  { module: yolov8_segment,   cls: Backend }
+  yolov8-pose:     { module: yolov8_pose,      cls: Backend }
+  yolov8-classify: { module: yolov8_classify,  cls: Backend }
+
+  # ---- RT-DETR（只有检测头）----
+  rtdetr-detect:   { module: rtdetr_detect,    cls: Backend }
+
+  # ---- 从零训练（内置架构 yaml，不加载预训练权重）----
+  scratch-detect:   { module: scratch_detect,   cls: Backend }
+  scratch-segment:  { module: scratch_segment,  cls: Backend }
+  scratch-pose:     { module: scratch_pose,     cls: Backend }
+  scratch-classify: { module: scratch_classify, cls: Backend }
+
+  # ---- 只做标注：提示分割（SAM / SAM2 / FastSAM）----
+  sam-segment:
+    module: sam_segment
+    cls: Backend
+    note: 只实现 predict；不参与训练与评估
+
+  # ---- 只做标注：线上 VLM（配置在 configs/vlm/，没有 configs/models 目录）----
+  vlm-remote:
+    module: vlm_remote
+    cls: Backend
+    label: 线上 VLM（configs/vlm/ 里选的模型）
+    virtual: true
+    note: 模型推理发生在服务商侧；支持自动发现类别

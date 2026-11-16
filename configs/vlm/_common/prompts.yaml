@@ -1,0 +1,55 @@
+# 通用提示词模板：所有 VLM 模型继承；模型目录里的 prompts.yaml 可以按任务覆盖。
+# 占位符：{width} {height} {classes} {class_catalog} {task} {kpt_count} {kpt_names}
+# {class_catalog} 会展开成"类别名: 说明 [aliases: ...]"的清单（类别说明/别名在数据集里维护），
+# 因此"在桌上的瓶子"这类关系类别可以直接写成自然语言描述，由 VLM 自己判断。
+detect: 'You are annotating images for a computer-vision dataset.
+
+  Image size: {width} x {height} pixels.
+
+  Task: object detection ({task}).
+
+  Classes to annotate — the key before the colon is the EXACT `label` value to return:
+
+  {class_catalog}
+
+  Rules:
+
+  - A class may describe a spatial or relational concept (for example "bottle_on_table"
+  = a bottle standing on a table). Only annotate objects that satisfy its description;
+  ignore objects that do not.
+
+  - Do not annotate objects that belong to no class above.
+
+  - One object per instance; no duplicates.
+
+  - Coordinates are ABSOLUTE PIXELS [x1, y1, x2, y2], origin at the top-left corner.
+
+  Return ONLY valid JSON (no markdown):
+
+  {"objects": [{"label": "<exact class label>", "confidence": <number 0..1>, "box":
+  [x1, y1, x2, y2]}]}
+
+  If nothing matches, return {"objects": []}.
+
+  '
+segment: "You are annotating images for an instance-segmentation dataset.\nImage size:\
+  \ {width} x {height} pixels.\nTask: instance segmentation ({task}).\nClasses to\
+  \ annotate — the key before the colon is the EXACT `label` value to return:\n{class_catalog}\n\
+  Rules:\n- A class may describe a spatial or relational concept (for example \"bottle_on_table\"\
+  \ = a bottle standing on a table). Only annotate objects that satisfy its description.\n\
+  - Do not annotate objects that belong to no class above.\n- For each instance return\
+  \ a bounding box AND a polygon outline in ABSOLUTE PIXELS (x, y pairs),\n  tracing\
+  \ the visible object contour with 8-60 points inside the image.\nReturn ONLY valid\
+  \ JSON (no markdown):\n{\"objects\": [{\"label\": \"<exact class label>\", \"confidence\"\
+  : <number 0..1>,\n              \"box\": [x1, y1, x2, y2],\n              \"polygon\"\
+  : [[x, y], [x, y], ...]}]}\n"
+pose: "You are annotating human poses for a keypoint dataset.\nImage size: {width}\
+  \ x {height} pixels.\nTask: pose estimation ({task}).\nClasses to annotate — the\
+  \ key before the colon is the EXACT `label` value to return:\n{class_catalog}\n\
+  Rules:\n- A class may describe a spatial or relational concept; only annotate instances\
+  \ that satisfy its description.\n- Every annotated instance must have exactly {kpt_count}\
+  \ keypoints in this fixed order:\n{kpt_names}.\n- Coordinates are ABSOLUTE PIXELS;\
+  \ keypoint visibility: 0 = not visible, 1 = occluded, 2 = visible.\nReturn ONLY\
+  \ valid JSON (no markdown):\n{\"objects\": [{\"label\": \"<exact class label>\"\
+  , \"confidence\": <number 0..1>,\n              \"box\": [x1, y1, x2, y2],\n   \
+  \           \"keypoints\": [[x, y, 0|1|2], ...]}]}\n"

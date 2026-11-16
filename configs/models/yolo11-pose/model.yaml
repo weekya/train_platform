@@ -1,0 +1,13 @@
+# 模型 = 架构族 + 检测头；权重文件名沿用官方命名（detect 无后缀，seg/pose/cls 带后缀）
+id: yolo11-pose
+family: yolo11
+head: pose
+label: YOLO11 · 姿态关键点
+tasks: [pose]
+role: trainable
+order: 12
+notes: YOLO11 系列（n/s/m/l/x），detect/segment/pose/classify 全覆盖。参数默认值即 ultralytics 默认。
+  姿态头：输出框 + 关键点（kpt_shape 由数据集决定）。
+weights:
+  pose: {n: yolo11n-pose.pt, s: yolo11s-pose.pt, m: yolo11m-pose.pt, l: yolo11l-pose.pt,
+    x: yolo11x-pose.pt}

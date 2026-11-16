@@ -1,0 +1,12 @@
+# 模型 = 架构族 + 检测头；权重文件名沿用官方命名（detect 无后缀，seg/pose/cls 带后缀）
+id: yolo11-classify
+family: yolo11
+head: classify
+label: YOLO11 · 图像分类
+tasks: [classify]
+role: trainable
+order: 13
+notes: YOLO11 系列（n/s/m/l/x），detect/segment/pose/classify 全覆盖。参数默认值即 ultralytics 默认。
+  分类头：输出整图类别，不做定位，增强与检测头不同。
+weights:
+  classify: {n: yolo11n-cls.pt, s: yolo11s-cls.pt, m: yolo11m-cls.pt}
