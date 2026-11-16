@@ -28,7 +28,7 @@ running_time/
 *.part
 *.log
 
-# ---- v1 归档（仅本机参考）----
+# ---- 历史归档（v1/trainstack 已删除；留这条防止以后放归档误提交）----
 legacy/
 
 # ---- Python ----

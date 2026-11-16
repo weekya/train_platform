@@ -102,7 +102,6 @@ train_platform/
 │   │   ├── high/                 #     每个组件目录内再分：高频（访问日志/逐张/逐轮）
 │   │   └── low/                  #                           低频（启停/生命周期/告警）
 │   └── startup.log               #   start.sh 的启动输出
-├── legacy/                       # v1 框架归档（trainstack），仅作参考
 └── docs/                         # 架构 / 标注 / 训练说明
 ```
 
@@ -430,4 +429,5 @@ logging:
 `projects/<p>/jobs/<job-id>/log.txt`（Web「作业日志」面板读的就是它）。
 
 **Q：v1（trainstack）的代码去哪了？**
-归档在 `legacy/`，仅作参考，平台不再依赖它。
+已删除（2026-11）。v1 是「数据仓/权重仓/配置仓三仓分离」的最小训练框架（`trainstack`，9k 行），
+被 v2 的项目隔离模型取代后一度作为参考归档，现已清理；v2 从未依赖它。
