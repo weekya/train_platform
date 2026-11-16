@@ -319,6 +319,21 @@ def start_train_job(
         raise CommandError("请选择训练模型")
     # 提前校验模型和类别，把错误挡在排队之前（下载交给 worker）
     model_info = prepare_model_ref(project, model)
+    # 能力位前置校验：只标注的实现（sam-segment / vlm-remote）不许排队训练，
+    # 否则用户要等作业跑起来才看到错误。
+    try:
+        from . import impl as implmod
+
+        # model 可能直接是模型 id（含只标注的 virtual 实现），也可能是权重名/路径
+        _backend = (implmod.load(str(model)) if str(model) in implmod.impls()
+                    else implmod.for_ref(project, model))
+        _caps = set(getattr(_backend, "capabilities", set()) or set())
+        if "train" not in _caps:
+            raise CommandError(
+                f"模型 {_backend.model_id} 不支持训练（capabilities={sorted(_caps)}）；"
+                f"它只能用于标注，请换成可训练的架构（如 yolo11-detect）")
+    except implmod.BackendError:
+        pass          # 架构 yaml / 未知引用交给 worker 解析
     params = trainmod.validate_params(params, family=model_info.get("family"))
     datasets = [Dataset(project, str(item.get("dataset") or item.get("id"))) for item in selections]
     classes = datasets[0].classes

@@ -38,8 +38,14 @@ const emit = defineEmits(['update:modelValue'])
 const custom = ref(false)
 
 const families = computed(() => {
-  const list = (props.catalog?.families || []).filter(f => f.role !== 'segmenter')
-  return list.filter(f => (f.weights || {})[props.task])
+  // 能力位由实现层声明（configs/models/_impls.yaml → impl/*.py）；
+  // 没有 capabilities 的旧数据退回到 role 判断，保证向后兼容。
+  const canTrain = (f) => Array.isArray(f.capabilities)
+    ? f.capabilities.includes('train')
+    : f.role !== 'segmenter'
+  return (props.catalog?.families || [])
+    .filter(canTrain)
+    .filter(f => (f.weights || {})[props.task])
 })
 const selectedPreset = computed(() => {
   const inProject = props.projectModels.some(m => m.id === props.modelValue)

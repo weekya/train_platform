@@ -111,7 +111,7 @@ train_platform/
 
 | 需求 | 实现 |
 |---|---|
-| 平台化：数据集生成、标注、训练、评估 | 6 个页面 + 32 个 REST 接口 + 完整 CLI；所有动作都落到 `projects/<p>/` 下的文件 |
+| 平台化：数据集生成、标注、训练、评估 | 9 个页面 + 58 个 REST 接口 + 12 个 CLI 命令组；所有动作都落到 `projects/<p>/` 下的文件 |
 | 项目隔离：数据集/模型/训练记录/评估方法 | 每个项目一个目录，`project.yaml` 定义任务与类别；数据集/权重/记录互不可见 |
 | 上传图片各种格式 → 统一格式 | `imaging.normalize_image`：jpg/png/webp/bmp/tif/gif/ppm… → 统一 `jpg`（可配置）；EXIF 转正、透明铺白、CMYK/调色板/灰度统一 RGB、等比缩放（不拉伸）、内容 sha1 去重 |
 | 模型标注：detect / sam / pose / VLM | `labelers/`：YOLO .pt（detect/segment/pose）、SAM/SAM2/FastSAM（框→掩码、全景分割）、VLM（**线上** OpenAI 兼容接口，本机不跑视觉大模型）；自动标注可再叠加 SAM 轮廓细化 |

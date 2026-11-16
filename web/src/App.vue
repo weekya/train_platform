@@ -135,8 +135,9 @@ const VIEWS = {
 const navItems = [
   { name: 'overview', label: '项目概览', icon: '◉' },
   { name: 'datasets', label: '数据集', icon: '▦' },
+  // 「VLM 标注」不再单列：它就是自动标注页把模型切成「线上 VLM」，
+  // 路由 labelvlm 保留（老链接可用，进来后自动选中 vlm-remote）
   { name: 'label', label: '自动标注', icon: '✎' },
-  { name: 'labelvlm', label: 'VLM 标注', icon: '✧' },
   { name: 'train', label: '模型训练', icon: '⚙' },
   { name: 'models', label: '模型', icon: '◈' },
   { name: 'eval', label: '评估测试', icon: '◎' },

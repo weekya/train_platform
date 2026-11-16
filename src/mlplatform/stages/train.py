@@ -64,6 +64,11 @@ def run(ctx: StageContext) -> dict[str, Any]:
     task = str(spec.get("task") or project.task)
     backend = _backend_for(spec, task)
     ctx.log(f"实现: {backend.model_id}（框架 {getattr(backend, 'framework', '?')}）")
+    if "train" not in set(getattr(backend, "capabilities", set()) or set()):
+        raise ModelError(
+            f"模型 {backend.model_id} 不支持训练"
+            f"（capabilities={sorted(getattr(backend, 'capabilities', set()) or set())}）；"
+            f"它可能只用于标注，请换成可训练的实现")
     ctx.progress(done=0, total=1, message="准备数据集", force=True)
     data_info = backend.prepare_data(
         ctx, project, train_dir / "data", selections,
