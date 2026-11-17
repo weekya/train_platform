@@ -40,6 +40,12 @@ impls:
   scratch-pose:     { module: scratch_pose,     cls: Backend }
   scratch-classify: { module: scratch_classify, cls: Backend }
 
+  # ---- 第二个框架：TorchVision 官方 COCO 检测器（只做标注）----
+  torchvision-detect:
+    module: torchvision_detect
+    cls: Backend
+    note: 与 ultralytics 无共享代码；capabilities 只有 predict
+
   # ---- 只做标注：提示分割（SAM / SAM2 / FastSAM）----
   sam-segment:
     module: sam_segment

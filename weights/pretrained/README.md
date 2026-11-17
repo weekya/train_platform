@@ -39,3 +39,15 @@ PYTHONNOUSERSITE=1 envs/prefixes/train_system/bin/python3 -c \
 ```
 
 文件损坏时页面会提示加载失败，删掉重新下载即可。
+
+## 其它框架的权重（手动放入）
+
+平台的"模型实现层"（`configs/models/_impls.yaml`）支持非 ultralytics 的实现，
+它们的权重也要放进本目录，只是**不会自动下载**：
+
+| 实现 | 需要的文件 | 来源 |
+|---|---|---|
+| `torchvision-detect` | `ssdlite320_mobilenet_v3_large_coco-a79551b2.pth`（13MB）<br>`fasterrcnn_mobilenet_v3_large_fpn_coco-8969ebfa.pth`（75MB）<br>`fasterrcnn_resnet50_fpn_v2_coco-dd69338a.pth`（167MB） | PyTorch 官方权重（`download.pytorch.org/models/`），或 `torchvision` 首次加载时自动缓存到 `~/.cache/torch`，再复制过来 |
+
+联调时可以把标注参数里的 `weights` 填成 `random`（不加载权重，只验证管线是否通），
+预测结果没有意义，作业日志里会有 WARNING 提示。

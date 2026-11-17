@@ -217,6 +217,19 @@ def validate() -> list[str]:
     problems: list[str] = []
     table = impls()
     dirs = model_dirs()
+    # 每个模型目录的 model.yaml 必须能解析且 id 与目录名一致。
+    # 否则 catalogs 会把该目录**静默跳过**（模型从下拉框里消失，权重反查也失效）。
+    models_dir = paths.LAYOUT.models_dir
+    for model_id in sorted(dirs):
+        doc = read_yaml(models_dir / model_id / "model.yaml", None)
+        if not isinstance(doc, dict) or not doc.get("id"):
+            problems.append(
+                f"configs/models/{model_id}/model.yaml 解析失败或缺少 id"
+                f"（YAML 语法错误？该模型会从 /api/catalog 静默消失）")
+        elif str(doc.get("id")) != model_id:
+            problems.append(
+                f"configs/models/{model_id}/model.yaml 的 id={doc.get('id')!r} 与目录名不一致")
+
     missing = sorted(dirs - set(table))
     for model_id in missing:
         problems.append(

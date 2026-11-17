@@ -184,3 +184,52 @@ P1 落地记录（type 从调用链上退场 → 已删除）：
 | `model_id=… 与映射不一致` | 文件里的 `model_id` 必须等于 key |
 | 日志里 `实现: scratch-detect` 但模型是 yolo11 训的 | 该模型登记时没写 `family`（P0 之前训练的）；重新训练会带上，或忽略（同框架行为一致） |
 | 训练/评估报"不支持" | 该实现的 `capabilities` 里没有 `train`/`evaluate`（如 `sam-segment`、`vlm-remote`） |
+
+## 9. 第二个框架（TorchVision）：抽象到底灵不灵
+
+为了让"模型实现层"不是纸上设计，接入了**与 ultralytics 完全无共享代码**的第二个框架：
+TorchVision 官方 COCO 检测器（SSDLite / FasterRCNN）。
+
+| 维度 | ultralytics 那族 | TorchVision 这族 |
+|---|---|---|
+| 加载 | `YOLO(path)` | `factory(weights=None)` + `load_state_dict()` |
+| 推理 | `model.predict(source=..., stream=True)` | `torch.no_grad()` + `model(tensor)` |
+| 预处理 | 框架内部 | 自己写 `Resize + ToTensor + Normalize` |
+| 输出 | `Results` 对象 | `[{"boxes","scores","labels"}]` |
+| 类别 | checkpoint 自带 names | COCO 91 索引（含空洞位） |
+| 训练/评估 | 支持 | **不支持**（`capabilities = {"predict"}`） |
+
+### 加它到底动了几个文件
+
+```
+configs/models/torchvision-detect/model.yaml    # 新增：模型定义（weights 表）
+configs/models/torchvision-detect/params.yaml   # 新增：空（不训练）
+src/mlplatform/impl/torchvision_detect.py       # 新增：全部实现（~230 行）
+configs/models/_impls.yaml                      # 改：加一行映射
+```
+
+**stages / labelers / models_store / CLI / 前端：0 行改动。**
+`git status` 可验证——这就是"加模型只加文件、不碰共享代码"的实证。
+
+### 接入新框架时踩到的 4 个坑（已修，且都补了测试）
+
+| 坑 | 现象 | 结论 |
+|---|---|---|
+| **device 约定** | 平台传 `"0"`（ultralytics 风格），裸 torch 报 `Invalid device string: '0'` | 翻译放在实现层：`"0" → "cuda:0"`、`auto → cuda/cpu` |
+| **falsy 参数** | `float(spec.get("conf") or 0.25)` 把合法的 `conf=0.0` 吞成 0.25 | 用 `is not None` 判断，别用 `or` 兜底数值 |
+| **model.yaml 写坏** | 多行 `notes` 里出现 `": "` → YAML 解析失败 → 模型**从 catalog 静默消失** | `impl.validate()` 现在校验每个目录的 model.yaml 能解析且 `id` 与目录名一致，`bin/tp doctor` 会报 |
+| **权重可得性** | `download.pytorch.org` 在受限网络返回 403 | 实现层不做自动下载，给出"把 .pth 放进 weights/pretrained/"的明确提示；联调可用 `weights: random` |
+
+### 验证结果
+
+```bash
+PYTHONPATH=src python -c "from mlplatform import impl; print(impl.validate())"   # []
+bin/tp doctor                                                                    # 16 条映射（可训练 13，可标注 16）
+bin/tp label run -p demo --dataset <ds> --model torchvision-detect --weights random --classes person,bus
+#   -> 实现: torchvision-detect（框架 torchvision）
+#   -> 标注器: torchvision-detect / 随机权重（模型类别 81 个，数据集类别 2 个）
+#   -> 类别映射: 2 项  →  标注完成: 0 张有目标，2 张无目标
+```
+
+真实权重下（把官方 `.pth` 放进 `weights/pretrained/`）即可产出正常检测框；
+随机权重只能验证管线，日志会打 WARNING 说明这一点。

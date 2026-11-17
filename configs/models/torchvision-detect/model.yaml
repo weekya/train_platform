@@ -1,0 +1,22 @@
+# 模型 = 架构族 + 检测头；权重文件名沿用官方命名
+#
+# 第二个框架的样例：TorchVision 官方 COCO 检测器。
+# 它和 ultralytics 那族没有任何共享代码（推理方式、预处理、输出格式都不同），
+# 实现见 src/mlplatform/impl/torchvision_detect.py。
+id: torchvision-detect
+family: torchvision
+head: detect
+label: TorchVision · COCO 检测器（SSDLite / FasterRCNN）
+tasks: [detect]
+role: labeler            # 只做标注；能力位由实现声明（capabilities = {predict}）
+order: 60
+# 多行说明必须用块标量：plain scalar 里出现 ": " 会被 YAML 当成新键（踩过）
+notes: >-
+  官方 COCO 预训练检测器，只做自动标注（推理），不参与训练与评估。
+  权重需手动放进 weights/pretrained/（官方 .pth 文件）；
+  联调时可用 random 作为权重名（预测结果无意义）。
+weights:
+  detect:
+    ssdlite: ssdlite320_mobilenet_v3_large_coco-a79551b2.pth
+    fasterrcnn-mnv3: fasterrcnn_mobilenet_v3_large_fpn_coco-8969ebfa.pth
+    fasterrcnn-r50: fasterrcnn_resnet50_fpn_v2_coco-dd69338a.pth

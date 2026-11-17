@@ -1,0 +1,5 @@
+# 本模型不参与训练，因此没有任何训练参数（能力位 capabilities = {predict}）。
+# 保留这个文件是为了目录结构统一；界面不会为它渲染参数表。
+override: []
+extra: []
+unsupported: []

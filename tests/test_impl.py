@@ -25,6 +25,23 @@ def test_mapping_has_no_problems():
     assert problems == [], problems
 
 
+def test_broken_model_yaml_is_reported():
+    """model.yaml 写坏（YAML 语法错）时，doctor 必须报出来，而不是让模型静默消失。"""
+    from mlplatform import paths as _paths
+
+    bad_dir = _paths.LAYOUT.models_dir / "broken-model"
+    bad_dir.mkdir(parents=True, exist_ok=True)
+    (bad_dir / "model.yaml").write_text(
+        "id: broken-model\nnotes: 这里有个冒号: 会让 YAML 解析失败\n", encoding="utf-8")
+    try:
+        problems = impl.validate()
+        assert any("broken-model" in p and "解析失败" in p for p in problems), problems
+    finally:
+        for f in bad_dir.glob("*"):
+            f.unlink()
+        bad_dir.rmdir()
+
+
 def test_every_config_models_dir_has_impl():
     dirs = impl.model_dirs()
     table = impl.impls()
@@ -177,3 +194,101 @@ def test_task_matrix():
         assert "不匹配" in str(exc)
     else:
         raise AssertionError("任务不匹配时必须报错")
+
+
+# --------------------------------------------------------------------------- #
+# 第二个框架：torchvision（推理方式与 ultralytics 完全不同）
+# --------------------------------------------------------------------------- #
+def test_torchvision_backend_contract():
+    backend = impl.load("torchvision-detect")
+    assert backend.framework == "torchvision"
+    assert backend.capabilities == {"predict"}      # 不训练、不评估
+    ok, reason = backend.labeler_task_support("detect")
+    assert ok
+    ok, reason = backend.labeler_task_support("segment")
+    assert not ok and "detect" in reason
+
+
+def test_torchvision_weights_name_maps_to_impl():
+    ref = "ssdlite320_mobilenet_v3_large_coco-a79551b2.pth"
+    assert impl.for_ref(None, ref).model_id == "torchvision-detect"
+
+
+def test_torchvision_missing_weights_gives_actionable_error():
+    """没有权重时必须说清怎么修（这台机器连不上 download.pytorch.org）。"""
+    from mlplatform.impl.base import BackendError as _BErr  # noqa: F401
+    from mlplatform.impl.base import LabelJob
+    from mlplatform.labelers.base import LabelerError
+
+    backend = impl.load("torchvision-detect")
+    job = LabelJob(project=None, spec={"weights": "绝对不存在的权重.pth"})
+    try:
+        backend.build_labeler(job)
+    except LabelerError as exc:
+        assert "weights/pretrained" in str(exc)
+    else:
+        raise AssertionError("权重缺失时必须报错")
+
+
+def test_torchvision_predict_conversion():
+    """框坐标缩放 + 置信度过滤 + COCO 名字映射 + 空洞类别丢弃，全部用桩模型验证。"""
+    from mlplatform.impl.torchvision_detect import COCO_NAMES, TorchvisionLabeler
+
+    import torch
+
+    class _StubOut:
+        def __init__(self):
+            # 模型在 320x320 上推理；原图假设 640x480 -> 缩放比 x2 / x1.5
+            self.data = {
+                "boxes": torch.tensor([[0.0, 0.0, 100.0, 100.0],      # person，分数够
+                                       [10.0, 10.0, 50.0, 50.0],      # bus，分数不够
+                                       [0.0, 0.0, 20.0, 20.0]]),     # 空洞类别（N/A）
+                "scores": torch.tensor([0.9, 0.1, 0.8]),
+                "labels": torch.tensor([1, 6, 12]),
+            }
+
+        def get(self, key, default=None):
+            return self.data.get(key, default)
+
+    labeler = TorchvisionLabeler.__new__(TorchvisionLabeler)   # 跳过真正加载模型
+    labeler.device = "cpu"
+    labeler.conf = 0.5
+    labeler.imgsz = 320
+    labeler.names = COCO_NAMES
+    labeler.failures = {}
+    labeler.warnings = []
+    labeler.model = lambda tensor: [_StubOut()]
+
+    from PIL import Image
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "x.jpg"
+        Image.new("RGB", (640, 480)).save(str(path), "JPEG")
+        items = labeler._predict_one(path)
+
+    # 只剩 person 那条（bus 分数 0.1 < 0.5；label 12 是 N/A）
+    assert len(items) == 1, items
+    assert items[0]["cls"] == 1 and labeler.names[1] == "person"
+    # 320 -> 640/480 的还原比例：x2 与 x1.5
+    assert items[0]["box"] == [0.0, 0.0, 200.0, 150.0], items[0]["box"]
+
+
+def test_torchvision_conf_zero_is_respected():
+    """conf=0.0 是合法值（不能被 `or` 兜底成 0.25）。"""
+    backend = impl.load("torchvision-detect")
+    from mlplatform.impl.base import LabelJob
+
+    job = LabelJob(project=None, spec={"weights": "random", "conf": 0.0})
+    labeler = backend.build_labeler(job)
+    assert labeler.conf == 0.0, labeler.conf
+
+
+def test_torchvision_device_translation():
+    """平台用 "0" 表示第一张 GPU（ultralytics 习惯），裸 torch 只认 cuda:0——实现层负责翻译。"""
+    from mlplatform.impl.torchvision_detect import TorchvisionLabeler as T
+
+    assert T._normalize_device("0") in {"cuda:0"}
+    assert T._normalize_device("0,1") in {"cuda:0"}
+    assert T._normalize_device("cpu") == "cpu"
+    assert T._normalize_device("cuda:1") == "cuda:1"
+    assert T._normalize_device("auto") in {"cpu", "cuda"}
