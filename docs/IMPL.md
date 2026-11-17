@@ -211,6 +211,20 @@ configs/models/_impls.yaml                      # 改：加一行映射
 **stages / labelers / models_store / CLI / 前端：0 行改动。**
 `git status` 可验证——这就是"加模型只加文件、不碰共享代码"的实证。
 
+### 训练侧也解耦了（第二次迭代才发现）
+
+第一次抽壳只搬了"怎么跑"，漏了训练里几处 **ultralytics 约定**，现已收进实现层：
+
+| 原来在 `stages/train.py` 里 | 现在 |
+|---|---|
+| `params.update({"project":…, "name":"run", "exist_ok":…})` | `backend.train_extras(train_dir)` |
+| `params.setdefault("plots"/"val", True)` | 同上 |
+| 续训固定读 `<train>/weights/last.pt` | `backend.resume_weights(train_dir)` |
+| 登记时固定看 `best.pt`/`last.pt` | `TrainOutcome.best_path / last_path` |
+| `training.json` 的 params 混入 `project` 等框架键 | 只记用户参数（`user_params`） |
+
+好处：换一个能训练的框架时，stage 不用再改；记录里的参数也不会掺进框架内部键。
+
 ### 接入新框架时踩到的 4 个坑（已修，且都补了测试）
 
 | 坑 | 现象 | 结论 |

@@ -65,6 +65,9 @@ class TrainOutcome:
 
     run_dir: Path | None = None
     weights_dir: Path | None = None
+    # 具体权重文件由实现给出，stage 不再假定叫 best.pt / last.pt
+    best_path: Path | None = None
+    last_path: Path | None = None
     rows: list[dict[str, Any]] = field(default_factory=list)
     metrics: dict[str, Any] = field(default_factory=dict)
     history: list[dict[str, Any]] = field(default_factory=list)
@@ -120,6 +123,18 @@ class ModelBackend(Protocol):
              resume_from: Path | None = None) -> LoadedModel: ...
 
     def check_dataset_task(self, model_task: str, dataset_task: str) -> None: ...
+
+    def train_extras(self, train_dir: Path) -> dict[str, Any]:
+        """训练前要补进 params 的**框架专属**参数（例如 ultralytics 的 project/name）。
+
+        这些键不该出现在 stage 里——那是框架细节；也不该进 ``training.json`` 的
+        params 记录（用户没填过它们）。
+        """
+        ...
+
+    def resume_weights(self, train_dir: Path) -> Path | None:
+        """断点续训用的权重（没有就返回 None）。文件名约定同样属于框架。"""
+        ...
 
     def train(self, ctx: Any, *, train_dir: Path, loaded: LoadedModel,
               data_info: dict[str, Any], params: dict[str, Any], epochs: int,

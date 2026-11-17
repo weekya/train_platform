@@ -292,3 +292,33 @@ def test_torchvision_device_translation():
     assert T._normalize_device("cpu") == "cpu"
     assert T._normalize_device("cuda:1") == "cuda:1"
     assert T._normalize_device("auto") in {"cpu", "cuda"}
+
+
+# --------------------------------------------------------------------------- #
+# 训练产物契约：框架专属约定不能漏到 stage 里
+# --------------------------------------------------------------------------- #
+def test_ultralytics_train_extras_and_resume():
+    """project/name/exist_ok 这些是 ultralytics 的事，应由实现层提供。"""
+    import tempfile
+
+    backend = impl.load("yolo11-detect")
+    with tempfile.TemporaryDirectory() as tmp:
+        train_dir = Path(tmp)
+        extras = backend.train_extras(train_dir)
+        assert set(extras) >= {"project", "name", "exist_ok"}
+        assert extras["name"] == "run"
+        # 没有 last.pt 时不该报"可续训"
+        assert backend.resume_weights(train_dir) is None
+        (train_dir / "weights").mkdir()
+        (train_dir / "weights" / "last.pt").write_bytes(b"x")
+        assert backend.resume_weights(train_dir) == train_dir / "weights" / "last.pt"
+
+
+def test_train_outcome_carries_weight_paths():
+    """登记的权重文件由实现给出（不假定叫 best.pt）。"""
+    from mlplatform.impl.base import TrainOutcome
+
+    outcome = TrainOutcome(weights_dir=Path("/tmp/w"),
+                           best_path=Path("/tmp/w/model.ckpt"),
+                           last_path=Path("/tmp/w/last.ckpt"))
+    assert outcome.best_path.name == "model.ckpt"

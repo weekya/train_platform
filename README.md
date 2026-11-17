@@ -43,8 +43,9 @@ bin/tp train run -p 安全帽检测 --dataset <数据集 id> --model yolo11s.pt 
 bin/tp eval run -p 安全帽检测 --dataset <数据集 id> --weights <模型 id> --split val --wait
 ```
 
-网页版把同样的流程做成了 9 个页面：**项目概览 / 数据集 / 自动标注 / VLM 标注 /
-模型训练 / 模型 / 评估测试 / 运行环境 / 作业日志**。
+网页版把同样的流程做成了 8 个页面：**项目概览 / 数据集 / 自动标注 / 模型训练 /
+模型 / 评估测试 / 运行环境 / 作业日志**。
+（VLM 标注不单独占一项：它就是「自动标注」页把模型切成「线上 VLM」，`#/labelvlm` 老链接仍可用。）
 「模型」页管训练产物与上传权重（下载、改名、设为默认、删除），「运行环境」页展示四个 conda 环境的实测状态。
 
 `bin/tp --help` 列出所有命令；`bin/tp <命令> --help` 看单个命令的参数。
@@ -111,7 +112,7 @@ train_platform/
 
 | 需求 | 实现 |
 |---|---|
-| 平台化：数据集生成、标注、训练、评估 | 9 个页面 + 58 个 REST 接口 + 12 个 CLI 命令组；所有动作都落到 `projects/<p>/` 下的文件 |
+| 平台化：数据集生成、标注、训练、评估 | 8 个页面 + 58 个 REST 接口 + 12 个 CLI 命令组；所有动作都落到 `projects/<p>/` 下的文件 |
 | 项目隔离：数据集/模型/训练记录/评估方法 | 每个项目一个目录，`project.yaml` 定义任务与类别；数据集/权重/记录互不可见 |
 | 上传图片各种格式 → 统一格式 | `imaging.normalize_image`：jpg/png/webp/bmp/tif/gif/ppm… → 统一 `jpg`（可配置）；EXIF 转正、透明铺白、CMYK/调色板/灰度统一 RGB、等比缩放（不拉伸）、内容 sha1 去重 |
 | 模型标注：detect / sam / pose / VLM | `labelers/`：YOLO .pt（detect/segment/pose）、SAM/SAM2/FastSAM（框→掩码、全景分割）、VLM（**线上** OpenAI 兼容接口，本机不跑视觉大模型）；自动标注可再叠加 SAM 轮廓细化 |
@@ -431,3 +432,19 @@ logging:
 **Q：v1（trainstack）的代码去哪了？**
 已删除（2026-11）。v1 是「数据仓/权重仓/配置仓三仓分离」的最小训练框架（`trainstack`，9k 行），
 被 v2 的项目隔离模型取代后一度作为参考归档，现已清理；v2 从未依赖它。
+
+---
+
+## 10. 许可与第三方依赖
+
+本仓库自身是**平台代码**（编排、作业调度、数据集/标注/评估流水线）。
+
+| 依赖 | 许可 | 说明 |
+|---|---|---|
+| `ultralytics`（训练/评估/YOLO 标注） | **AGPL-3.0** | ⚠️ **强 copyleft**。把基于它的服务对外提供时，通常需要开源你的修改，或购买 ultralytics 商业授权 |
+| `torch` / `torchvision`（`torchvision-detect` 实现） | BSD-3-Clause | 无 copyleft 约束 |
+| `fastapi` / `uvicorn` / `pillow` / `opencv` … | MIT / BSD / Apache-2.0 | — |
+| 预训练权重（`weights/pretrained/*.pt`） | 沿用上游（多为 AGPL 或 COCO 训练集条款） | 权重不进仓库，按需下载/自行放置 |
+
+**选型提示**：如果商用且不能开源，评估阶段可以用 `torchvision-detect`（BSD）替代
+ultralytics 的模型做推理；但**训练**目前只能走 ultralytics（AGPL）。

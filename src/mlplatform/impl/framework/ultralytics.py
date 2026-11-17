@@ -102,6 +102,20 @@ class UltralyticsBackend:
                 f"请选择 {dataset_task} 权重（或 {dataset_task} 数据集）")
 
     # ---- 训练 ---------------------------------------------------------
+    def train_extras(self, train_dir: Path) -> dict[str, Any]:
+        """ultralytics 专属：训练产物落在 <train>/ultra/run，且要求这几个键。"""
+        return {
+            "plots": True,
+            "val": True,
+            "project": str((train_dir / "ultra").resolve()),
+            "name": "run",
+            "exist_ok": True,
+        }
+
+    def resume_weights(self, train_dir: Path) -> Path | None:
+        last = train_dir / "weights" / "last.pt"
+        return last if last.is_file() else None
+
     def metric_keys(self, task: str) -> dict[str, str]:
         """本框架 results.csv 里指标列名（换框架时这个口径一定不同）。"""
         return trainmod.metric_keys_for_task(task)
@@ -160,8 +174,12 @@ class UltralyticsBackend:
         artifacts = trainmod.copy_artifacts(run_dir, train_dir)
         rows = trainmod.parse_results_csv(train_dir / "results.csv") or rows_holder["rows"]
         metrics, history = self.summarize(rows, keys, started)
-        return TrainOutcome(run_dir=run_dir, weights_dir=train_dir / "weights",
-                            rows=rows, metrics=metrics, history=history, artifacts=artifacts)
+        weights_dir = train_dir / "weights"
+        return TrainOutcome(
+            run_dir=run_dir, weights_dir=weights_dir,
+            best_path=(weights_dir / "best.pt") if (weights_dir / "best.pt").is_file() else None,
+            last_path=(weights_dir / "last.pt") if (weights_dir / "last.pt").is_file() else None,
+            rows=rows, metrics=metrics, history=history, artifacts=artifacts)
 
     def summarize(self, rows: list[dict[str, Any]], keys: dict[str, str],
                   started: float) -> tuple[dict[str, Any], list[dict[str, Any]]]:

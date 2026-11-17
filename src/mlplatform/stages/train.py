@@ -98,8 +98,6 @@ def run(ctx: StageContext) -> dict[str, Any]:
         "patience": int(config.get("training.patience", 50)),
         "device": str(config.get("training.device", "0")),
         "optimizer": str(config.get("training.optimizer", "auto")),
-        "plots": True,
-        "val": True,
     }
     for key, value in defaults.items():
         params.setdefault(key, value)
@@ -111,17 +109,17 @@ def run(ctx: StageContext) -> dict[str, Any]:
     if compat.force_serial_workers(params):
         ctx.log("[warn] 信号量不可用，workers 已强制为 0")
     epochs = int(params.get("epochs") or 100)
-    params.update({
-        "project": str((train_dir / "ultra").resolve()),
-        "name": "run",
-        "exist_ok": True,
-    })
+    # 框架专属参数（ultralytics 要 project/name/exist_ok；别的框架可能一个都不要）。
+    # 这些不属于用户配置，所以记录 params 时把它们排除。
+    extras = dict(backend.train_extras(train_dir) or {})
+    user_params = dict(params)
+    params.update(extras)
     store.write_json(train_dir / "params.json", params)
 
     # ---- 3) 加载 + 训练（框架细节全在实现里）---------------------------
     resume = bool(params.get("resume"))
-    last_weights = train_dir / "weights" / "last.pt"
-    if resume and last_weights.is_file():
+    last_weights = backend.resume_weights(train_dir)     # 文件名约定归框架
+    if resume and last_weights is not None and Path(last_weights).is_file():
         ctx.log(f"断点续训: {paths.rel_of(last_weights)}")
         params["resume"] = True
         loaded = backend.load(model_arg, project, resume_from=last_weights)
@@ -157,13 +155,13 @@ def run(ctx: StageContext) -> dict[str, Any]:
 
     model_id = None
     weights_dir = outcome.weights_dir or (train_dir / "weights")
-    if (weights_dir / "best.pt").is_file() or (weights_dir / "last.pt").is_file():
+    if outcome.best_path or outcome.last_path:
         try:
             entry = ModelStore(project).add_from_training(
                 {"id": training_id, "name": spec.get("name") or training_id,
                  "task": data_info["task"], "classes": data_info["classes"], "metrics": metrics,
                  "family": backend.model_id},
-                weights_dir)
+                weights_dir, best=outcome.best_path, last=outcome.last_path)
             model_id = entry["id"]
             ctx.log(f"权重已登记: {entry['id']}（{paths.rel_of(paths.abs_of(entry['path']))}）")
         except Exception as exc:  # noqa: BLE001
@@ -173,7 +171,7 @@ def run(ctx: StageContext) -> dict[str, Any]:
         project, training_id,
         state="succeeded", finished_at=paths.utcnow(), duration=dur,
         metrics=metrics, history=history, artifacts=artifacts, model_id=model_id,
-        params={k: v for k, v in params.items() if k not in {"project"}},
+        params={k: v for k, v in user_params.items() if k not in extras},
         note=data_info.get("note", ""),
     )
     ctx.log(f"训练完成：{dur}s，best mAP50-95={metrics.get('map')}")

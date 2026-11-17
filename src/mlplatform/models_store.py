@@ -433,24 +433,31 @@ class ModelStore:
         write_json(model_dir / "meta.json", entry)
         return entry
 
-    def add_from_training(self, training_meta: dict[str, Any], weights_dir: str | Path) -> dict[str, Any]:
+    def add_from_training(self, training_meta: dict[str, Any], weights_dir: str | Path,
+                          best: str | Path | None = None,
+                          last: str | Path | None = None) -> dict[str, Any]:
+        """登记训练产物。
+
+        ``best`` / ``last`` 由调用方（模型实现层）给出实际文件路径——不同框架的
+        产物命名不一样，这里不再假定 ``best.pt``；不传时退回旧约定。
+        """
         weights_dir = Path(weights_dir)
-        best = weights_dir / "best.pt"
-        if not best.is_file():
-            last = weights_dir / "last.pt"
-            if not last.is_file():
-                raise ModelError("训练没有产出 best.pt / last.pt")
-            best = last
+        last_path = Path(last) if last else weights_dir / "last.pt"
+        best_path = Path(best) if best else weights_dir / "best.pt"
+        if not best_path.is_file() and last_path.is_file():
+            best_path = last_path
+        if not best_path.is_file():
+            raise ModelError("训练没有产出可用权重（best/last 都不存在）")
         training_id = str(training_meta.get("id") or weights_dir.parent.name)
         return self.add(
-            best,
-            name=f"{training_meta.get('name') or training_id}-{best.stem}",
+            best_path,
+            name=f"{training_meta.get('name') or training_id}-{best_path.stem}",
             task=str(training_meta.get("task") or "detect"),
             kind="trained",
             classes=list(training_meta.get("classes") or []),
             metrics=(training_meta.get("metrics") or {}),
             source={"kind": "training", "training": training_id},
-            extra_files={"last.pt": weights_dir / "last.pt"},
+            extra_files={"last.pt": last_path} if last_path.is_file() else None,
             family=str(training_meta.get("family") or ""),
         )
 
