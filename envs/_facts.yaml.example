@@ -1,0 +1,44 @@
+# ============================================================================
+# envs/_facts.yaml —— **实测事实**，由 `bin/tp env probe` 自动生成，不要手写。
+#
+# 这个文件记录"这台机器上环境到底跑得起来什么"：python / torch / CUDA / GPU /
+# jiterator 能力 / 包版本。它天然是**机器专属**的（含绝对路径），所以：
+#
+#   * 不进 git（.gitignore 已排除）；
+#   * 新机器上跑一次 `bin/tp env probe` 就会重新生成；
+#   * 没有它也能用——`envs.facts()` 会当成空字典，`bin/tp doctor` 会提示先 probe。
+#
+# 下面是**字段示例**（值都是占位，不是真实数据）：
+# ============================================================================
+main_system:
+  facts:
+    python: "3.x.y"
+    executable: "/path/to/train_platform/envs/prefixes/main_system/bin/python3"
+    prefix: "/path/to/train_platform/envs/prefixes/main_system"
+    machine: "<uname -m，例如 x86_64 / aarch64>"
+    packages:
+      torch: "<torch 版本，例如 2.x.y+cu12x>"
+      torchvision: "<torchvision 版本>"
+      ultralytics: "<ultralytics 版本>"
+      fastapi: "<fastapi 版本>"
+      uvicorn: "<uvicorn 版本>"
+      cv2: "<opencv 版本>"
+      numpy: "<numpy 版本>"
+      PIL: "<pillow 版本>"
+    torch:
+      version: "<torch 版本>"
+      cuda_available: "<true/false>"
+      arch_list: ["<torch 支持的 sm 列表，例如 sm_80>"]
+    gpu:
+      name: "<GPU 型号>"
+      capability: "<计算能力，例如 8.9>"
+      sm: "<例如 sm_89>"
+      arch_supported: "<torch 的 arch_list 是否覆盖该 GPU>"
+    jiterator:
+      ok: "<true/false：受限环境下 CUDA kernel 能否 JIT 编译>"
+    path: "envs/prefixes/main_system"
+    kind: conda-prefix
+    role: main
+    tags: [default, in-project, web]
+    probed_at: "<ISO 时间>"
+  verified_at: "<ISO 时间>"

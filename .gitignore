@@ -4,6 +4,8 @@
 # ---- 环境实体（几 GB，可由 envs/recipes 重建）----
 envs/prefixes/
 envs/.default_python
+# 实测事实：机器专属（绝对路径/GPU），由 `bin/tp env probe` 生成
+envs/_facts.yaml
 
 # ---- 预训练权重（按需下载 / 手工放入）----
 weights/pretrained/*.pt

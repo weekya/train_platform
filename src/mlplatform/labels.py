@@ -232,9 +232,13 @@ def items_to_raw(
     return out
 
 
-def items_from_raw(raw: Sequence[str], task: str, width: int, height: int,
+def items_from_raw(raw: Iterable[dict[str, Any]], task: str, width: int, height: int,
                    kpt_shape: Sequence[int] = DEFAULT_KPT_SHAPE) -> list[dict[str, Any]]:
-    """前端的 ``{cls, box, polygon, keypoints, conf}`` 列表 -> 内部条目（做一次合法性清洗）。"""
+    """前端的 ``{cls, box, polygon, keypoints, conf}`` 列表 -> 内部条目（做一次合法性清洗）。
+
+    注意：这里收的是**字典列表**（前端/标注编辑器传的像素坐标条目），
+    不是 YOLO txt 的文本行；文本行请用 :func:`read_labels`。
+    """
     items: list[dict[str, Any]] = []
     w, h = max(1, width), max(1, height)
     for entry in raw or []:

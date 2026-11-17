@@ -21,6 +21,8 @@ ultralytics: 8.4.208      opencv: 5.0.0      numpy: 2.5.4
 ```
 
 `bin/tp env probe` 会把每个环境的实测结果写进 `envs/_facts.yaml`；
+这个文件是**机器专属**的（含绝对路径、GPU 型号），**不进 git**——
+字段示例见 `envs/_facts.yaml.example`，新机器跑一次 probe 就会生成；
 `bin/tp env list` 显示"python / torch / CUDA / GPU"，`bin/tp env doctor` 检查登记一致性。
 页面「运行环境」页展示同样的数据，并可以单个/全部重新探测。
 
@@ -36,7 +38,8 @@ ultralytics: 8.4.208      opencv: 5.0.0      numpy: 2.5.4
 ```
 envs/
 ├── _registry.yaml        # 人工维护：名字 / 路径 / 角色 / 说明 / 重建脚本
-├── _facts.yaml           # 机器写入：实测事实（probe 生成，可随时重跑）
+├── _facts.yaml           # 机器写入：实测事实（probe 生成，可随时重跑；不入库）
+├── _facts.yaml.example   # 字段示例（入库，说明这个文件长什么样）
 ├── .default_python       # bin/tp 与 start.sh 读取的解释器相对路径
 ├── recipes/
 │   ├── main_system.sh    # 建母本（从零 pip 安装，或 --clone 一个已有前缀）

@@ -22,9 +22,13 @@ version: 2
 default_env: main_system
 
 conda:
-  # 建环境用的 conda base（只用于创建/克隆，运行时直接调用环境里的 python，不需要激活）
+  # 建环境用的 conda base（只用于创建/克隆；运行时直接调用环境里的 python，不需要激活）
+  #
+  # ⚠ 换机器必须改这里（代码不读这一项，只给人看；recipes 用 CONDA_BASE / CONDA_BIN
+  #   环境变量，未设置时会自动探测常见安装位置）。
+  # 下面只是占位示例：
   bases:
-    - /opt/robot/model-service/miniconda3
+    - /opt/miniconda3
 
 envs:
   main_system:

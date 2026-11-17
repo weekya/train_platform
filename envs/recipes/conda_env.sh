@@ -15,7 +15,20 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 NAME="${1:?用法: conda_env.sh <环境名> [克隆源]}"
 SRC="${2:-$HERE/envs/prefixes/main_system}"
 PREFIX="$HERE/envs/prefixes/$NAME"
-CONDA_BIN="${CONDA_BIN:-/opt/robot/model-service/miniconda3/bin/conda}"
+# conda base 探测：优先环境变量，其次 PATH 上的 conda，再看常见安装位置。
+# 刻意不写死路径——这个仓库是公开的，机器相关的路径不该进版本库。
+if [ -n "${CONDA_BASE:-}" ]; then
+  :
+elif [ -n "${CONDA_EXE:-}" ]; then
+  CONDA_BASE="$(cd "$(dirname "$CONDA_EXE")/.." && pwd)"
+elif command -v conda >/dev/null 2>&1; then
+  CONDA_BASE="$(cd "$(dirname "$(command -v conda)")/.." && pwd)"
+else
+  for cand in /opt/miniconda3 /opt/conda "$HOME/miniconda3" "$HOME/miniconda" "$HOME/anaconda3"; do
+    [ -x "$cand/bin/conda" ] && { CONDA_BASE="$cand"; break; }
+  done
+fi
+CONDA_BIN="${CONDA_BIN:-${CONDA_BASE:-}/bin/conda}"
 
 if [[ ! -x "$SRC/bin/python3" ]]; then
   echo "[error] 克隆源不存在: $SRC" >&2

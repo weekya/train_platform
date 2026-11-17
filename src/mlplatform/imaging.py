@@ -269,6 +269,9 @@ def plan_tiles(
         "windows": 0,
         "reason": "",
         "oversize": oversize,
+        # 窗口是否被放大过（目标比 imagz 大）。mode 会因"继续切窗"变成 grid，
+        # 所以放大这件事必须单独记一个字段，否则报告里统计不到。
+        "expanded": False,
     }
 
     extent = max(max(b[2] - b[0], b[3] - b[1]) for b in boxes) if boxes else None
@@ -286,6 +289,7 @@ def plan_tiles(
     if extent is not None and extent > tile:
         if extent <= max_tile:
             new_tile = min(max_tile, max(tile, _ceil_to(int(extent * 1.05) + 2, align)))
+            info["expanded"] = new_tile > tile
             info.update(mode="expand", reason=(
                 f"最大目标边长 {int(extent)}px > imagz {tile}px，窗口放大到 {new_tile}px 以完整保留目标"))
         elif oversize == "skip":
@@ -299,6 +303,7 @@ def plan_tiles(
             return [{"x": 0, "y": 0, "w": W, "h": H}], info
         else:
             new_tile = max_tile
+            info["expanded"] = new_tile > tile
             info.update(mode="expand_cap", reason=(
                 f"最大目标边长 {int(extent)}px 超过 max_tile {max_tile}px，"
                 f"窗口取上限 {max_tile}px（该目标仍会被窗口边界截断，考虑增大 max_tile）"))
@@ -341,7 +346,9 @@ def tiling_summary(infos: Sequence[dict[str, Any]]) -> dict[str, Any]:
         "images": len(infos),
         "windows": total_windows,
         "modes": modes,
-        "expanded": sum(1 for i in infos if i.get("mode") in {"expand", "expand_cap"}),
+        # 老报告没有 expanded 字段，退回看 mode（expand/expand_cap）
+        "expanded": sum(1 for i in infos if i.get("expanded")
+                        or i.get("mode") in {"expand", "expand_cap"}),
         "skipped": sum(1 for i in infos if i.get("mode") == "skip"),
         "downscaled": sum(1 for i in infos if i.get("mode") == "downscale"),
         "unlabeled": sum(1 for i in infos if i.get("mode") == "grid_unknown"),

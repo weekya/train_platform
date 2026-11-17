@@ -39,6 +39,12 @@ def test_grid_positions_stride_clamped():
 # --------------------------------------------------------------------------- #
 # plan_tiles：小图不裁不放
 # --------------------------------------------------------------------------- #
+def test_not_expanded_for_normal_image():
+    windows, info = imaging.plan_tiles(1280, 960, tile=640, boxes=[[10, 10, 300, 300]])
+    assert info["expanded"] is False
+    assert imaging.tiling_summary([info])["expanded"] == 0
+
+
 def test_small_image_kept_whole():
     windows, info = imaging.plan_tiles(320, 240, tile=640)
     assert len(windows) == 1
@@ -81,6 +87,10 @@ def test_oversize_target_expands_window():
     assert any(w["x"] <= 100 and w["y"] <= 100
                and w["x"] + w["w"] >= 900 and w["y"] + w["h"] >= 800
                for w in windows), windows
+    # 放大必须能被统计到（mode 会变成 grid，所以另有 expanded 标记）
+    assert info["expanded"] is True
+    summary = imaging.tiling_summary([info])
+    assert summary["expanded"] == 1, summary
 
 
 def test_oversize_beyond_max_tile_skip():
