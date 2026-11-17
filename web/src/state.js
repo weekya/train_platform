@@ -120,9 +120,9 @@ export const JOB_STATES = {
   cancelled: { label: '已取消', kind: 'muted' },
 }
 
+// 与服务端保持一致：只列端到端已打通的任务（classify 尚未打通，别让用户选了再报错）
 export const TASKS = [
   { id: 'detect', label: '目标检测' },
   { id: 'segment', label: '实例分割' },
   { id: 'pose', label: '姿态关键点' },
-  { id: 'classify', label: '图像分类' },
 ]

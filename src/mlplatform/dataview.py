@@ -102,6 +102,10 @@ def build_data_yaml(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     entries, classes_ref, task = collect_entries(project, selections, split_filter=split_filter)
+    try:
+        labelmod.check_task_implemented(task, where="准备训练/评估数据")
+    except ValueError as exc:
+        raise DataViewError(str(exc)) from exc
     if classes:
         given = [str(c).casefold() for c in classes]
         if given != [c.casefold() for c in classes_ref]:

@@ -43,7 +43,32 @@ __all__ = [
     "count_items",
 ]
 
+#: 标签格式支持的枚举（内部类型；新增类型要同时补 items_to_raw/items_from_raw）
 TASKS = ("detect", "segment", "pose", "classify")
+
+#: **端到端已打通**的任务：项目/数据集创建、训练、评估、标注都支持
+IMPLEMENTED_TASKS = ("detect", "segment", "pose")
+
+#: 已登记但尚未打通的任务 -> 缺什么（给用户看的解释）
+UNIMPLEMENTED_TASKS: dict[str, str] = {
+    "classify": (
+        "classify 任务目前只登记了类型枚举，尚未端到端打通："
+        "标签写入（labels.items_to_raw）、数据视图（dataview 需要 ImageFolder 布局）、"
+        "指标口径（accuracy_top1/5 而非 mAP）三处都还没实现。"
+        "请先用 detect / segment / pose；模型配置目录（configs/models/*-classify）保留，"
+        "实现后可直接启用"
+    ),
+}
+
+
+def check_task_implemented(task: str | None, *, where: str = "") -> str:
+    """校验任务端到端可用；不可用时抛出带解释的 ValueError。"""
+    name = normalize_task(task)
+    reason = UNIMPLEMENTED_TASKS.get(name)
+    if reason:
+        prefix = f"{where}：" if where else ""
+        raise ValueError(prefix + reason)
+    return name
 DEFAULT_KPT_SHAPE = (17, 3)
 
 COCO17_FLIP_IDX = [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15]

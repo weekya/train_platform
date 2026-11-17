@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import io
 import shutil
@@ -20,7 +21,7 @@ from typing import Any, BinaryIO, Iterable, Sequence
 
 from PIL import Image
 
-from . import config, imaging, labels as labelmod, paths, viz
+from . import config, imaging, labels as labelmod, paths, store, viz
 from .paths import ProjectLayout
 from .projects import Project
 from .store import read_json, write_json, write_text, utcnow
@@ -73,6 +74,7 @@ class Dataset:
         self.raw_dir = self.dir / "raw"
         self.meta_file = self.dir / "dataset.json"
         self._meta: dict[str, Any] | None = None
+        self._base: dict[str, Any] | None = None
         self.autosave = True
 
     # ---- 元数据 --------------------------------------------------------
@@ -84,12 +86,75 @@ class Dataset:
                 raise DatasetError(f"数据集不存在: {self.id}（缺少 {paths.rel_of(self.meta_file)}）")
             data.setdefault("images", [])
             self._meta = data
+            # 基线快照：save() 时用它算出"我改了什么"，从而不覆盖别人改的部分
+            self._base = copy.deepcopy(data)
         return self._meta
 
+    # ------------------------------------------------------------------ #
+    # 保存：**锁内合并**，避免两个进程互相覆盖
+    # ------------------------------------------------------------------ #
     def save(self) -> None:
-        self.meta["updated_at"] = utcnow()
-        self.meta["stats"] = self.stats()
-        write_json(self.meta_file, self.meta)
+        """把本实例的改动合并进磁盘上的最新内容（而不是整体覆盖）。
+
+        背景：标注作业（worker 进程）会把整份 meta 读进内存跑很久，同时 Web 进程
+        也在改（手工修标注、上传图片、改类别）。如果两边都整体覆盖写，后写的一方
+        会把对方的改动抹掉——这是会**丢用户标注**的 bug。
+
+        做法：
+        1. ``fcntl`` 排它锁（跨进程）；
+        2. 锁内重新读磁盘上的最新版本；
+        3. 只应用"我相对基线真正改动过的部分"：
+           - 顶层字段：我改过的才覆盖；
+           - ``images``：按图片名逐条合并（新增/修改/删除各自生效）；
+        4. 重算 ``stats`` 后原子写回。
+
+        冲突语义：**同一张图**两边都改时，后写的赢（作业在标这张图，覆盖是预期行为）；
+        不同图、不同字段的改动都会保留。
+        """
+        base = getattr(self, "_base", None)
+        mine = self.meta
+
+        def _mutate(theirs: Any) -> dict[str, Any]:
+            merged = self._merge_into(theirs if isinstance(theirs, dict) else {}, base or {}, mine)
+            merged["updated_at"] = utcnow()
+            merged["stats"] = self.stats(merged)
+            return merged
+
+        merged = store.locked_json_update(self.meta_file, _mutate, default={})
+        if isinstance(merged, dict):
+            self._meta = merged
+            self._base = copy.deepcopy(merged)
+
+    @staticmethod
+    def _merge_into(theirs: dict[str, Any], base: dict[str, Any],
+                    mine: dict[str, Any]) -> dict[str, Any]:
+        """三方合并：theirs（磁盘最新）× base（我加载时的基线）× mine（我的内存版本）。
+
+        规则：我相对 base 改过的才覆盖 theirs；我没动过的保留 theirs。
+        """
+        merged = dict(theirs)
+        # -- 顶层字段 --
+        for key, value in mine.items():
+            if key in {"images", "stats", "updated_at"}:
+                continue
+            if key not in base or base.get(key) != value:
+                merged[key] = value
+        # -- images：按 name 逐条合并 --
+        mine_imgs = {str(e.get("name")): e for e in (mine.get("images") or [])}
+        base_imgs = {str(e.get("name")): e for e in (base.get("images") or [])}
+        theirs_imgs = {str(e.get("name")): e for e in (theirs.get("images") or [])}
+        order = [str(e.get("name")) for e in (theirs.get("images") or [])]
+        for name, entry in mine_imgs.items():
+            if name not in base_imgs:                 # 我新增的
+                theirs_imgs[name] = entry
+                order.append(name)
+            elif base_imgs[name] != entry:            # 我修改过的
+                theirs_imgs[name] = entry
+        for name in list(base_imgs):                  # 我删除的
+            if name not in mine_imgs:
+                theirs_imgs.pop(name, None)
+        merged["images"] = [theirs_imgs[n] for n in order if n in theirs_imgs]
+        return merged
 
     @property
     def name(self) -> str:
@@ -501,9 +566,10 @@ class Dataset:
             self.save()
 
     # ---- 统计 ----------------------------------------------------------
-    def stats(self) -> dict[str, Any]:
-        images = self.images()
-        classes = self.classes
+    def stats(self, meta: dict[str, Any] | None = None) -> dict[str, Any]:
+        node = meta if isinstance(meta, dict) else self.meta
+        images = list(node.get("images") or [])
+        classes = [str(c) for c in (node.get("classes") or self.project.classes)]
         per_class: dict[str, int] = {}
         instances = 0
         labeled = 0
@@ -602,6 +668,10 @@ def create_dataset(
     source: dict[str, Any] | None = None,
     split_ratio: dict[str, float] | None = None,
 ) -> Dataset:
+    try:
+        labelmod.check_task_implemented(task or project.task, where="创建数据集")
+    except ValueError as exc:
+        raise DatasetError(str(exc)) from exc
     ds_id = str(dataset_id or "").strip() or paths.new_id("ds")
     if not paths.PROJECT_ID_RE.match(ds_id):
         raise DatasetError(f"数据集 id 非法: {ds_id!r}")

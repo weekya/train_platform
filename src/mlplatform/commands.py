@@ -11,6 +11,7 @@ import time
 from typing import Any, Callable, Iterable
 
 from . import config, evaluation as evalmod, jobs as jobsmod, logs, paths, runner as runnermod
+from . import labels as labelmod
 from . import training as trainmod
 from .datasets import Dataset, DatasetError, create_dataset
 from .labelers import LabelerError, normalize_labeler_spec
@@ -29,6 +30,14 @@ __all__ = [
     "start_evaluate_job",
     "parse_selections",
 ]
+
+
+def _reject_unimplemented_task(task: str, where: str) -> None:
+    """classify 这类"登记了但没打通"的任务，在建作业时就拒绝，别让它跑一半才炸。"""
+    try:
+        labelmod.check_task_implemented(task, where=where)
+    except ValueError as exc:
+        raise CommandError(str(exc)) from exc
 
 
 # 模块导入期不配置日志（进程入口负责），这里只拿一个挂在平台根下的 logger
@@ -161,6 +170,7 @@ def start_label_job(
     title: str | None = None,
 ) -> dict[str, Any]:
     ds = Dataset(project, dataset)
+    _reject_unimplemented_task(ds.task, "自动标注")
     cfg = normalize_labeler_spec(labeler)
     # 先解析实现（能力判断、密钥、标题都要用它），后面的校验一律问它
     from . import impl as implmod
@@ -343,6 +353,7 @@ def start_train_job(
                 f"数据集 {ds.name} 的类别 {ds.classes} 与 {datasets[0].name} 的类别 {classes} 不一致，"
                 f"不能一起训练")
     task = task or datasets[0].task
+    _reject_unimplemented_task(task, "训练")
     training_id = paths.new_id("tr")
     spec: dict[str, Any] = {
         "training_id": training_id,
@@ -378,6 +389,7 @@ def start_evaluate_job(
     title: str | None = None,
 ) -> dict[str, Any]:
     ds = Dataset(project, dataset)
+    _reject_unimplemented_task(ds.task, "评估")
     weights_info = prepare_model_ref(project, weights)
     if str(weights).lower().endswith((".yaml", ".yml")):
         raise CommandError("评估需要一个训练好的权重文件（.pt），不能用架构 yaml")

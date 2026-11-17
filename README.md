@@ -429,6 +429,13 @@ logging:
 `bin/tp logs tail -c runner --follow` 跟着调度器看。作业本身的原始输出仍在
 `projects/<p>/jobs/<job-id>/log.txt`（Web「作业日志」面板读的就是它）。
 
+**Q：为什么选不了「图像分类（classify）」任务？**
+classify 目前只在类型枚举里登记，**端到端还没打通**：标签写入（`labels.items_to_raw`）、
+数据视图（`dataview` 需要 ImageFolder 布局而不是 data.yaml）、指标口径
+（`accuracy_top1/5` 而不是 mAP）三处都缺。所以项目/数据集/作业入口都会明确拒绝它
+（而不是让你跑到一半才失败），训练下拉里也不会出现。`configs/models/*-classify`
+的配置保留着，实现后即可直接启用。
+
 **Q：v1（trainstack）的代码去哪了？**
 已删除（2026-11）。v1 是「数据仓/权重仓/配置仓三仓分离」的最小训练框架（`trainstack`，9k 行），
 被 v2 的项目隔离模型取代后一度作为参考归档，现已清理；v2 从未依赖它。

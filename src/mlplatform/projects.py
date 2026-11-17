@@ -176,6 +176,12 @@ class ProjectStore:
         name = str(name or "").strip()
         if not name:
             raise ProjectError("项目名不能为空")
+        try:
+            from . import labels as _labels
+
+            task = _labels.check_task_implemented(task, where="创建项目")
+        except ValueError as exc:
+            raise ProjectError(str(exc)) from exc
         pid = str(project_id or "").strip() or paths.slugify(name)
         if not paths.PROJECT_ID_RE.match(pid):
             raise ProjectError(f"项目 id 只能包含字母/数字/._-，且不超过 64 字符: {pid!r}")

@@ -37,6 +37,23 @@ def _setup_root(keep: bool = False) -> Path:
     for name in ("projects", "state", "running_time", "weights/pretrained", "web"):
         (root / name).mkdir(parents=True, exist_ok=True)
     shutil.copytree(REPO / "configs", root / "configs")
+    # envs 注册表：runner/env 相关测试要读它（不复制 prefixes 实体，只复制登记表）
+    for name in ("_registry.yaml", "README.md"):
+        src = REPO / "envs" / name
+        if src.is_file():
+            (root / "envs").mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(src, root / "envs" / name)
+    # 测试里不要自动拉起项目调度器（ensure_runner 会 spawn 真实进程，既慢又留孤儿）
+    try:
+        import yaml
+
+        cfg_path = root / "configs" / "platform.yaml"
+        doc = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+        doc.setdefault("platform", {}).setdefault("runner", {})["auto_start"] = False
+        cfg_path.write_text(yaml.safe_dump(doc, allow_unicode=True, sort_keys=False),
+                            encoding="utf-8")
+    except Exception as exc:                      # noqa: BLE001
+        print(f"[setup] 关闭 runner.auto_start 失败: {exc}")
     os.environ["MLPLATFORM_ROOT"] = str(root)
     os.environ.setdefault("MLPLATFORM_OFFLINE", "1")
     if keep:

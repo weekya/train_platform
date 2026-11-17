@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +45,11 @@ STATE_LABELS = {
 }
 
 TERMINAL_STATES = {"succeeded", "failed", "cancelled"}
+
+
+def _order_key(job: dict[str, Any]) -> tuple[str, int]:
+    """作业排序键：创建时间 + 纳秒入队序号（同秒内也能稳定排序）。"""
+    return (str(job.get("created_at") or ""), int(job.get("enqueued_ns") or 0))
 
 
 class JobError(Exception):
@@ -98,6 +104,8 @@ class JobStore:
             "spec": spec or {},
             "tags": list(tags or []),
             "created_at": paths.utcnow(),
+            # created_at 只到秒；同一秒创建的多个作业靠这个纳秒序号保持 FIFO
+            "enqueued_ns": time.time_ns(),
             "started_at": None,
             "finished_at": None,
             "pid": None,
@@ -157,12 +165,17 @@ class JobStore:
                 if str(spec.get("dataset") or spec.get("source_dataset") or "") != dataset:
                     continue
             jobs.append(self._merge_live(job))
-        jobs.sort(key=lambda j: str(j.get("created_at") or ""), reverse=True)
+        jobs.sort(key=_order_key, reverse=True)
         return jobs[: max(1, int(limit))]
 
     def next_queued(self) -> dict[str, Any] | None:
+        """取最早排队的作业（FIFO）。
+
+        排序键是 ``(created_at, enqueued_ns)``：``created_at`` 只到秒，同一秒内
+        建的两个作业必须靠纳秒序号兜底，否则顺序不确定。
+        """
         queued = [j for j in self.list(limit=1000, state="queued")]
-        queued.sort(key=lambda j: str(j.get("created_at") or ""))
+        queued.sort(key=_order_key)
         return queued[0] if queued else None
 
     def running(self) -> list[dict[str, Any]]:

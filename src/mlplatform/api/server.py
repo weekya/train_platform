@@ -27,6 +27,7 @@ from .. import __version__, commands, config, envs, evaluation as evalmod
 from .. import jobs as jobsmod, logs, paths, runner as runnermod
 from .. import training as trainmod
 from ..datasets import Dataset, DatasetError, create_dataset, list_datasets
+from .. import labels as labelmod
 from ..labelers import LabelerError
 from ..labelers.vlm import VLM_MODEL_SUGGESTIONS, probe_vlm
 from ..models_store import (
@@ -39,7 +40,8 @@ __all__ = ["create_app"]
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 TEXT_EXTS = {".json", ".jsonl", ".csv", ".yaml", ".yml", ".md", ".txt", ".log", ".sh", ".py"}
-TASKS = ["detect", "segment", "pose", "classify"]
+#: 界面上可选的任务 = 端到端已打通的那些（classify 尚未打通，不出现在下拉框）
+TASKS = list(labelmod.IMPLEMENTED_TASKS)
 
 
 # --------------------------------------------------------------------------- #
@@ -289,9 +291,14 @@ def create_app(token: str | None = None) -> FastAPI:
     def get_dataset(pid: str, did: str) -> tuple[Project, Dataset]:
         project = get_project(pid)
         try:
-            return project, Dataset(project, did)
+            ds = Dataset(project, did)
         except DatasetError:
             raise HTTPException(status_code=404, detail=f"数据集不存在: {did}")
+        # Dataset.__init__ 只拼路径，真正的存在性要在这里确认，
+        # 否则"数据集已删除"会一路走到别处变成 400（曾经如此）
+        if not ds.meta_file.is_file():
+            raise HTTPException(status_code=404, detail=f"数据集不存在: {did}")
+        return project, ds
 
     def safe_project_file(project: Project, rel: str) -> Path:
         """读取项目内的文件。

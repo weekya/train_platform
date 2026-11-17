@@ -6,8 +6,11 @@
 
 from __future__ import annotations
 
+import contextlib
+import errno
 import json
 import os
+import time
 import shutil
 import tempfile
 from pathlib import Path
@@ -18,6 +21,8 @@ import yaml
 from .paths import utcnow
 
 __all__ = [
+    "file_lock",
+    "locked_json_update",
     "read_json",
     "write_json",
     "update_json",
@@ -130,3 +135,69 @@ def human_size(num: float) -> str:
             return f"{num:.1f}{unit}" if unit != "B" else f"{int(num)}B"
         num /= 1024.0
     return f"{num:.1f}PB"
+
+
+# --------------------------------------------------------------------------- #
+# 跨进程并发
+# --------------------------------------------------------------------------- #
+@contextlib.contextmanager
+def file_lock(path: str | Path, timeout: float = 15.0, exclusive: bool = True):
+    """跨进程文件锁（``fcntl.flock``），用于 read-modify-write 的原子化。
+
+    * 锁文件是 ``<path>.lock`` 而不是 ``<path>`` 本身——因为写盘用的是
+      ``os.replace``（换 inode），锁在被换掉的文件上没有意义；
+    * 非 POSIX 平台没有 ``fcntl``，退化成"无锁"（单进程场景仍然正确）；
+    * 拿不到锁最多等 ``timeout`` 秒，超时就抛错，绝不静默继续写。
+
+    典型用法（数据集元数据的并发写）::
+
+        with file_lock(ds.meta_file):
+            data = read_json(ds.meta_file, {})
+            ... 改 data ...
+            write_json(ds.meta_file, data)
+    """
+    try:
+        import fcntl
+    except ImportError:                       # pragma: no cover - 非 POSIX
+        yield
+        return
+    lock_path = Path(str(path) + ".lock")
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    handle = lock_path.open("a+")
+    deadline = time.time() + max(0.1, float(timeout))
+    try:
+        while True:
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+                break
+            except OSError as exc:
+                if exc.errno not in (errno.EACCES, errno.EAGAIN, errno.EWOULDBLOCK):
+                    raise
+                if time.time() > deadline:
+                    raise TimeoutError(f"等待文件锁超时: {lock_path}") from exc
+                time.sleep(0.05)
+        yield
+    finally:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        except OSError:
+            pass
+        handle.close()
+
+
+def locked_json_update(path: str | Path, mutator: Any, default: Any = None,
+                       timeout: float = 15.0) -> Any:
+    """在文件锁内读取 -> 修改 -> 原子写回，返回写入后的数据。
+
+    ``mutator(current)`` 收到磁盘上的**最新**内容，返回要写回的新内容；
+    返回 ``None`` 表示"不写"。
+    """
+    with file_lock(path, timeout=timeout):
+        current = read_json(path, default)
+        updated = mutator(current)
+        if updated is not None:
+            write_json(path, updated)
+        return updated if updated is not None else current
