@@ -611,6 +611,45 @@ def cmd_job(args: argparse.Namespace) -> int:
 # --------------------------------------------------------------------------- #
 # model / runner / web / doctor
 # --------------------------------------------------------------------------- #
+def cmd_predict(args: argparse.Namespace) -> int:
+    """单张图片即刻推理（不建数据集、不进作业队列）。"""
+    from . import predict as predictmod
+
+    project = _project(args)
+    params = {
+        "imgsz": args.imgsz, "conf": args.conf, "iou": args.iou,
+        "max_det": args.max_det, "device": args.device,
+    }
+    if args.dataset:
+        result = predictmod.predict_dataset_image(
+            project, args.dataset, args.image_name,
+            model=args.model, weights=args.weights, params=params, render=bool(args.render))
+    else:
+        result = predictmod.predict_image(
+            project, args.image, model=args.model, weights=args.weights,
+            params=params, render=bool(args.render))
+    if args.json:
+        return emit(result, True) or 0
+    info = result["image"]
+    out(f"图片: {info['name']}  {info['width']}×{info['height']}")
+    out(f"模型: {result['model']['id']} / {result['model']['name']}  device={result['model']['device']}")
+    out(f"耗时: {result['duration_ms']} ms   命中 {result['count']} 个目标")
+    for item in result["items"][: args.limit]:
+        box = ",".join(f"{v:.0f}" for v in (item.get("box") or []))
+        out(f"  {item.get('name') or item.get('cls'):<14} conf={item.get('conf')}  box=[{box}]")
+    for warning in result.get("warnings") or []:
+        out(f"[warn] {warning}")
+    if args.preview:
+        target = Path(args.preview).expanduser()
+        data = result.get("preview") or ""
+        if data.startswith("data:") and "base64," in data:
+            import base64
+
+            target.write_bytes(base64.b64decode(data.split("base64,", 1)[1]))
+            out(f"预览图: {target}")
+    return 0
+
+
 def cmd_model(args: argparse.Namespace) -> int:
     project = _project(args)
     store = ModelStore(project)
@@ -1227,6 +1266,25 @@ def build_parser() -> argparse.ArgumentParser:
     p_vlm.add_argument("--timeout", type=float)
     p_vlm.add_argument("--json", action="store_true")
     p_vlm.set_defaults(func=cmd_vlm)
+
+    # predict
+    p_pred = sub.add_parser("predict", help="单张图片即刻推理（试跑，不建数据集）")
+    p_pred.add_argument("-p", "--project")
+    p_pred.add_argument("--image", help="图片路径")
+    p_pred.add_argument("--dataset", help="从数据集取图（配合 --image-name）")
+    p_pred.add_argument("--image-name", dest="image_name", help="数据集里的图片名")
+    p_pred.add_argument("--model", required=True, help="模型 id（configs/models/<id>）")
+    p_pred.add_argument("--weights", help="权重（默认用该模型的默认权重）")
+    p_pred.add_argument("--conf", type=float, default=0.25)
+    p_pred.add_argument("--iou", type=float, default=0.7)
+    p_pred.add_argument("--imgsz", type=int)
+    p_pred.add_argument("--max-det", dest="max_det", type=int)
+    p_pred.add_argument("--device")
+    p_pred.add_argument("--limit", type=int, default=20, help="最多打印几个目标")
+    p_pred.add_argument("--preview", help="把带框预览图写到这个路径")
+    p_pred.add_argument("--no-render", dest="render", action="store_false")
+    p_pred.add_argument("--json", action="store_true")
+    p_pred.set_defaults(func=cmd_predict)
 
     # doctor
     p_doctor = sub.add_parser("doctor", help="平台自检")

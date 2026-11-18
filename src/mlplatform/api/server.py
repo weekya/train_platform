@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import tempfile
@@ -24,7 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .. import __version__, commands, config, envs, evaluation as evalmod
-from .. import jobs as jobsmod, logs, paths, runner as runnermod
+from .. import jobs as jobsmod, logs, paths, predict, runner as runnermod
 from .. import training as trainmod
 from ..datasets import Dataset, DatasetError, create_dataset, list_datasets
 from .. import labels as labelmod
@@ -111,6 +112,15 @@ class SplitBody(BaseModel):
 
 class ClassesBody(BaseModel):
     add: list[str] = Field(default_factory=list)
+
+
+class PredictRun(BaseModel):
+    """即刻推理参数（只对数据集里已有的图重推时用 JSON）。"""
+    model: str | None = None
+    weights: str | None = None
+    task: str | None = None
+    params: dict[str, Any] = Field(default_factory=dict)
+    render: bool = True
 
 
 class ModelUpdate(BaseModel):
@@ -840,11 +850,73 @@ def create_app(token: str | None = None) -> FastAPI:
             entry = ModelStore(project).add(
                 target, name=name or Path(file.filename or "model").stem,
                 task=task, kind="uploaded",
-                classes=[c.strip() for c in classes.split(",") if c.strip()])
+                classes=[c.strip() for c in classes.split(",") if c.strip()],
+                # 记录格式，前端据此提示"仅推理"
+                family="", extra_meta={"format": suffix.lower().lstrip(".")})
         finally:
             await file.close()
             shutil.rmtree(tmp_dir, ignore_errors=True)
         return entry
+
+    # ---- 即刻推理（不建数据集、不进队列）------------------------------
+    @app.post("/api/projects/{pid}/predict")
+    async def api_predict_upload(pid: str,
+                                 file: UploadFile = File(...),
+                                 model: str = Form(...),
+                                 weights: str = Form(""),
+                                 task: str = Form(""),
+                                 params: str = Form("{}"),
+                                 render: bool = Form(True)) -> dict[str, Any]:
+        """传一张图，直接返回框/多边形/关键点（同步执行，不落盘、不写标签）。"""
+        project = get_project(pid)
+        try:
+            extra = json.loads(params or "{}")
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="params 必须是合法 JSON")
+        suffix = Path(file.filename or "image.jpg").suffix or ".jpg"
+        tmp_dir = Path(tempfile.mkdtemp(prefix="mlplatform-predict-"))
+        try:
+            target = tmp_dir / f"input{suffix}"
+            with target.open("wb") as fh:
+                while True:
+                    chunk = await file.read(1 << 20)
+                    if not chunk:
+                        break
+                    fh.write(chunk)
+            await file.close()
+            return predict.predict_image(
+                project, target, model=model, weights=weights or None,
+                params=extra, task=task or None, render=render)
+        except LabelerError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    @app.post("/api/projects/{pid}/datasets/{did}/images/{name}/predict")
+    def api_predict_dataset_image(pid: str, did: str, name: str,
+                                  body: PredictRun) -> dict[str, Any]:
+        """对数据集里已有的一张图重推，并返回已存标注便于对比（只读）。"""
+        project, ds = get_dataset(pid, did)
+        if not body.model:
+            raise HTTPException(status_code=400, detail="缺少 model（模型 id）")
+        try:
+            return predict.predict_dataset_image(
+                project, ds.id, name, model=body.model, weights=body.weights,
+                params={**body.params, "task": body.task} if body.task else body.params,
+                render=body.render)
+        except (LabelerError, DatasetError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+    @app.get("/api/projects/{pid}/predict/cache")
+    def api_predict_cache(pid: str) -> dict[str, Any]:
+        get_project(pid)
+        return predict.cache_info()
+
+    @app.delete("/api/projects/{pid}/predict/cache")
+    def api_predict_cache_clear(pid: str) -> dict[str, Any]:
+        get_project(pid)
+        predict.clear_cache()
+        return {"cleared": True}
 
     @app.get("/api/projects/{pid}/models/{mid}/download")
     def api_model_download(pid: str, mid: str) -> FileResponse:

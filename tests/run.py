@@ -37,6 +37,14 @@ def _setup_root(keep: bool = False) -> Path:
     for name in ("projects", "state", "running_time", "weights/pretrained", "web"):
         (root / name).mkdir(parents=True, exist_ok=True)
     shutil.copytree(REPO / "configs", root / "configs")
+    # 预训练权重池：软链到仓库，让"真推理"测试能加载权重（只读，不复制几十 MB）
+    repo_weights = REPO / "weights" / "pretrained"
+    if repo_weights.is_dir():
+        try:
+            (root / "weights").mkdir(parents=True, exist_ok=True)
+            (root / "weights" / "pretrained").symlink_to(repo_weights, target_is_directory=True)
+        except OSError:
+            pass
     # envs 注册表：runner/env 相关测试要读它（不复制 prefixes 实体，只复制登记表）
     for name in ("_registry.yaml", "README.md"):
         src = REPO / "envs" / name

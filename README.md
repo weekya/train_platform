@@ -196,6 +196,9 @@ bin/tp label run -p <p> --dataset <ds> --model yolo11-detect --weights yolo11n.p
 bin/tp train run -p <p> --dataset <ds>[:img1,img2] --model yolo11n.pt --epochs 100 --param lr0=0.01
 bin/tp eval  run -p <p> --dataset <ds> --weights <模型 id 或 .pt> --split val
 
+# 即刻推理（单张图片，不建数据集、不进队列）
+bin/tp predict -p <p> --image x.jpg --model yolo11-detect --weights yolo11s.pt --preview out.jpg
+
 # 日志（全局，进程独立，自动轮转）
 bin/tp logs show                     # 生效配置 + 各组件最新文件
 bin/tp logs list [-c web|runner|job|cli] [--channel high|low]
@@ -391,6 +394,7 @@ logging:
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) —— 分层、作业生命周期、数据模型
 - [`docs/LOGGING.md`](docs/LOGGING.md) —— 全局日志：文件布局、级别、轮转、排障
 - [`docs/IMPL.md`](docs/IMPL.md) —— 模型实现层：模型 id → 实现代码的映射、契约、加模型步骤
+- [`docs/INFERENCE.md`](docs/INFERENCE.md) —— 推理能力：即刻推理/作业推理、接口、支持的格式与边界
 - [`docs/LABELING.md`](docs/LABELING.md) —— 标注器、imgz 自适应裁减规则、人工修正
 - [`docs/TRAINING.md`](docs/TRAINING.md) —— 数据选择、训练参数、评估指标
 - [`envs/README.md`](envs/README.md) —— 四个环境的实测事实与重建方法

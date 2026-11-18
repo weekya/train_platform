@@ -10,6 +10,7 @@
       <button class="tiny danger" :disabled="sel < 0" @click="removeSelected">删除选中</button>
       <button class="tiny ghost" @click="clearAll">清空</button>
       <span class="right row tight">
+        <button class="tiny" :class="{ primary: probeOpen }" @click="probeOpen = !probeOpen">🔍 试跑对比</button>
         <button class="tiny ghost" @click="$emit('navigate', -1)">← 上一张</button>
         <button class="tiny ghost" @click="$emit('navigate', 1)">下一张 →</button>
       </span>
@@ -23,6 +24,42 @@
       <span class="right row tight">
         <button class="tiny primary" :disabled="saving" @click="save">{{ saving ? '保存中…' : '保存标注' }}</button>
       </span>
+    </div>
+
+    <div v-if="probeOpen" class="panel" style="padding: 10px; margin-bottom: 10px">
+      <div class="row" style="margin-bottom: 8px">
+        <b style="font-size: 13px">即刻推理（不写标注）</b>
+        <span class="spacer" />
+        <span v-if="probe" class="small faint">命中 {{ probe.count }} · {{ Math.round(probe.duration_ms) }}ms</span>
+      </div>
+      <div class="row tight" style="margin-bottom: 8px; flex-wrap: wrap">
+        <select v-model="probeModel" style="width: auto; min-width: 150px">
+          <option v-for="l in labelers" :key="l.id" :value="l.id">{{ l.label || l.id }}</option>
+        </select>
+        <input v-model="probeWeights" placeholder="权重（留空用默认）" style="width: 220px" />
+        <input type="number" v-model.number="probeConf" min="0" max="1" step="0.05" style="width: 90px"
+               title="置信度" />
+        <button class="tiny primary" :disabled="probing" @click="runProbe()">
+          {{ probing ? '推理中…' : '跑一次' }}
+        </button>
+        <button class="tiny ghost" v-if="probe" :disabled="probing" @click="applyProbe">用结果替换标注</button>
+      </div>
+      <div v-if="probeError" class="small" style="color: var(--err)">{{ probeError }}</div>
+      <div v-if="probe" class="row" style="gap: 10px; align-items: flex-start">
+        <img v-if="probe.preview" :src="probe.preview" alt="试跑预览"
+             style="max-width: 55%; border-radius: 6px; border: 1px solid var(--line)" />
+        <div class="small" style="flex: 1">
+          <div class="faint" style="margin-bottom: 4px">
+            模型 {{ probe.model.id }} / {{ probe.model.name }}；已有标注 {{ (probe.stored_items || []).length }} 条
+          </div>
+          <div v-for="(it, i) in probe.items.slice(0, 10)" :key="i" class="mono">
+            {{ it.name || it.cls }} · {{ Number(it.conf ?? 0).toFixed(3) }} ·
+            [{{ (it.box || []).map(v => Math.round(v)).join(',') }}]
+          </div>
+          <div v-if="probe.items.length > 10" class="faint">… 其余 {{ probe.items.length - 10 }} 条</div>
+          <div v-for="(w, i) in probe.warnings || []" :key="'w'+i" style="color: var(--warn)">⚠ {{ w }}</div>
+        </div>
+      </div>
     </div>
 
     <div class="label-compare">
@@ -77,6 +114,8 @@ const props = defineProps({
   classes: { type: Array, default: () => [] },
   kptShape: { type: Array, default: () => [17, 3] },
   initialItems: { type: Array, default: () => [] },
+  // 可标注的模型（来自 /api/catalog 的 labelers），用于"试跑对比"
+  labelers: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['navigate', 'saved'])
 
@@ -96,6 +135,47 @@ const viewScale = ref(1)
 const MAX_CANVAS_SIDE = 2400
 let drag = null
 
+// ---- 试跑对比 ----
+const probeOpen = ref(false)
+const probed = ref(false)
+const probing = ref(false)
+const probe = ref(null)
+const probeError = ref('')
+const probeModel = ref((props.labelers[0] || {}).id || 'yolo11-detect')
+const probeWeights = ref('')
+const probeConf = ref(0.25)
+
+async function runProbe() {
+  probing.value = true
+  probeError.value = ''
+  try {
+    probe.value = await api.predictDatasetImage(props.project, props.dataset, props.image.name, {
+      model: probeModel.value,
+      weights: probeWeights.value || undefined,
+      params: { conf: probeConf.value },
+      render: true,
+    })
+  } catch (e) {
+    probeError.value = e.message
+    probe.value = null
+  } finally {
+    probing.value = false
+  }
+}
+
+/** 把试跑结果替换成当前标注（不自动保存，仍需点「保存标注」）。 */
+function applyProbe() {
+  if (!probe.value?.items?.length) {
+    toast('试跑没有结果，无法替换', 'warn')
+    return
+  }
+  if (!confirm(`用试跑的 ${probe.value.items.length} 个目标替换当前 ${items.value.length} 个标注？`)) return
+  items.value = JSON.parse(JSON.stringify(probe.value.items.map(({ name, ...rest }) => rest)))
+  dirty.value = true
+  sel.value = -1
+  toast('已替换为试跑结果，记得保存', 'ok')
+}
+
 const task = computed(() => props.task || 'detect')
 const imageSrc = computed(() => urls.image(props.project, props.dataset, props.image.name))
 const kptCount = computed(() => Number(props.kptShape?.[0] || 17))
@@ -108,6 +188,7 @@ function resetFromProps() {
   draw()
 }
 
+watch(() => props.image?.name, () => { probe.value = null; probeError.value = '' })
 watch(() => props.image.name, () => {
   resetFromProps()
   loading.value = true

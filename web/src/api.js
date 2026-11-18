@@ -72,6 +72,12 @@ export const api = {
   runTile: (pid, did, body) => request(`${P(pid)}/datasets/${did}/tile`, { method: 'POST', body }),
   runRelation: (pid, did, body) => request(`${P(pid)}/datasets/${did}/relate`, { method: 'POST', body }),
 
+  // 即刻推理（试跑）：不建数据集、不进队列
+  predictDatasetImage: (pid, did, name, body) =>
+    request(`${P(pid)}/datasets/${did}/images/${encodeURIComponent(name)}/predict`, { method: 'POST', body }),
+  predictCache: (pid) => request(`${P(pid)}/predict/cache`),
+  clearPredictCache: (pid) => request(`${P(pid)}/predict/cache`, { method: 'DELETE' }),
+
   jobs: (pid, params) => request(`${P(pid)}/jobs${qs(params)}`),
   job: (pid, jid) => request(`${P(pid)}/jobs/${jid}`),
   jobLog: (pid, jid, offset = 0) => request(`${P(pid)}/jobs/${jid}/log${qs({ offset })}`),

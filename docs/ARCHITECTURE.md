@@ -161,6 +161,35 @@ models/<m>/last.pt
 models/<m>/meta.json       # 出生证明：来源训练、类别、指标、sha1
 ```
 
+### 4.6 数据集元数据的并发写（`dataset.json`）
+
+标注作业（worker 进程）会把整份 meta 读进内存跑很久，同时 Web 进程也在改
+（手工修标注、上传图片、改类别）。如果两边都"整体覆盖写"，后写的一方会把对方的改动抹掉
+—— 会丢用户标注。因此 `Dataset.save()` 是**锁内三方合并**：
+
+```
+flock(dataset.json.lock)                      # 跨进程排它锁
+  theirs = 重新读磁盘上的最新 dataset.json
+  merged = merge(theirs, base=加载时快照, mine=内存版本)
+  merged["stats"] = 重新计算
+  原子写回（mkstemp + os.replace）
+```
+
+| 改动 | 语义 |
+|---|---|
+| 不同图片各改各的 | 都保留 |
+| 一边新增/删除图片 | 另一边保存时不会抹掉、也不会让删掉的图复活 |
+| 顶层字段（classes / class_meta / notes…） | 我改过的才覆盖 |
+| **同一张图**两边都改 | 后写的赢（作业正在标这张图，覆盖是预期行为） |
+| `stats` | 永远按合并后的内容重算 |
+
+### 4.7 即刻推理（`predict.py`）
+
+单张图片同步出结果，**不建数据集、不进作业队列**：`POST /api/projects/<p>/predict`（上传图）、
+`POST .../datasets/<ds>/images/<name>/predict`（重推已有图，附已存标注用于对比）、
+`bin/tp predict`。复用同一套标注器与结果适配，模型在 Web 进程内加载并缓存（最多 2 个），
+同一时刻只跑一个推理。详见 [`INFERENCE.md`](INFERENCE.md)。
+
 ## 5. 数据视图（训练/评估喂给 ultralytics 的东西）
 
 `dataview.build_data_yaml()` 把"选择的图片集合"写成：

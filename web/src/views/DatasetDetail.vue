@@ -116,7 +116,8 @@
     <Modal v-if="editing" :title="`标注 · ${editing.name}`" xwide @close="editing = null">
       <LabelEditor :project="projectId" :dataset="dataset.id" :image="editing"
                    :task="dataset.task" :classes="dataset.classes" :kpt-shape="dataset.kpt_shape"
-                   :initial-items="editingItems" @saved="onSaved" @navigate="navigateImage" />
+                   :initial-items="editingItems" :labelers="labelers"
+                   @saved="onSaved" @navigate="navigateImage" />
     </Modal>
 
     <Modal v-if="classMetaOpen" title="类别说明 / 别名（给 VLM 提示词用）" wide @close="classMetaOpen = false">
@@ -260,6 +261,7 @@ import { api } from '../api'
 import { fmtBytes, navigate, toast } from '../state'
 import Modal from '../components/Modal.vue'
 import LabelEditor from '../components/LabelEditor.vue'
+import { loadCatalog } from '../state'
 
 const props = defineProps({ projectId: String, routeId: String, meta: Object })
 const dataset = ref(null)
@@ -269,6 +271,8 @@ const loading = ref(true)
 const busy = ref(false)
 const editing = ref(null)
 const editingItems = ref([])
+const catalog = ref(null)
+const labelers = computed(() => (catalog.value?.labelers || []).filter(l => l.id))
 const tileOpen = ref(false)
 const classesOpen = ref(false)
 const classForm = ref('')
@@ -464,5 +468,9 @@ async function removeDataset() {
 }
 
 watch(() => props.routeId, async () => { await loadInfo(); await loadImages(0) })
-onMounted(async () => { await loadInfo(); await loadImages(0) })
+onMounted(async () => {
+  await loadInfo()
+  await loadImages(0)
+  try { catalog.value = await loadCatalog() } catch (e) { /* 试跑下拉拿不到就算了 */ }
+})
 </script>

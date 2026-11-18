@@ -33,6 +33,14 @@ __all__ = [
 ]
 
 
+#: 只能用于**推理/标注**、不能训练也不能算 mAP 的权重格式。
+#: 这些格式可以被 ultralytics 的 AutoBackend 加载做 predict，但没有 trainer / validator。
+INFERENCE_ONLY_SUFFIXES = {".onnx", ".engine", ".torchscript", ".tflite", ".pb", ".mlpackage"}
+
+#: 只有这些后缀的权重能训练
+TRAINABLE_SUFFIXES = {".pt", ".pth"}
+
+
 class ModelError(Exception):
     """模型不存在 / 权重文件缺失 / 无法下载。"""
 
@@ -267,6 +275,11 @@ def resolve_model_ref(project: Project | None, ref: str | None, download: bool =
         cand = base / text
         if cand.is_file():
             return cand
+    if candidate.suffix.lower() in INFERENCE_ONLY_SUFFIXES:
+        # 导出版型不做自动下载（体积大、来源不可控），也避免误报成网络错误
+        raise ModelError(
+            f"找不到边缘/导出格式的权重: {text}。这类文件不会被自动下载，"
+            f"请放到 {paths.rel_of(paths.LAYOUT.pretrained)}/，或先作为项目模型上传")
     if candidate.suffix == ".pt" or text in _catalog_names():
         if download:
             return download_pretrained(text)
@@ -395,6 +408,7 @@ class ModelStore:
         source: dict[str, Any] | None = None,
         extra_files: dict[str, str | Path] | None = None,
         family: str = "",
+        extra_meta: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         src = Path(source_path)
         if not src.is_file():
@@ -427,6 +441,9 @@ class ModelStore:
         if family:
             # 权重 -> 模型实现（configs/models/_impls.yaml）：评估/推理时直接按它选实现
             entry["family"] = str(family)
+        for _key, _value in (extra_meta or {}).items():
+            if _value not in (None, ""):
+                entry[str(_key)] = _value
         data = self._load()
         data["models"].append(entry)
         self._save(data)

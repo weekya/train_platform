@@ -192,3 +192,75 @@ def test_spa_fallback_serves_index_or_missing_page():
     c = client()
     r = c.get("/some/spa/route")
     assert r.status_code == 200        # 前端未构建时也会给一个说明页
+
+
+# --------------------------------------------------------------------------- #
+# 即刻推理（不建数据集、不进队列）
+# --------------------------------------------------------------------------- #
+def _has_weight(name: str = "yolo11s.pt") -> bool:
+    from mlplatform import paths
+
+    return (paths.LAYOUT.pretrained / name).is_file()
+
+
+def test_predict_dataset_image_returns_items_and_stored():
+    """对数据集里的图重推：返回新结果 + 已存标注（供前端对比）。"""
+    if not _has_weight():
+        return                      # 本机没有权重就跳过（CI 上正常跳过）
+    c = client()
+    pid = c.post("/api/projects", json={"name": "推理", "id": "apipred",
+                                        "task": "detect", "classes": ["person"]}).json()["id"]
+    did = c.post(f"/api/projects/{pid}/datasets",
+                 json={"name": "d", "classes": ["person"]}).json()["id"]
+    # 直接塞一张真实图片进数据集（绕过上传，仅测试用）
+    from PIL import Image
+
+    from mlplatform.datasets import Dataset
+    from mlplatform.projects import ProjectStore
+
+    project = ProjectStore().get(pid)
+    ds = Dataset(project, did)
+    Image.new("RGB", (320, 240), (120, 120, 120)).save(ds.images_dir / "a.jpg", "JPEG")
+    ds.meta["images"].append({"name": "a.jpg", "split": "train", "width": 320, "height": 240,
+                              "bytes": 1, "sha1": "x", "labels": 0})
+    ds.save()
+
+    r = c.post(f"/api/projects/{pid}/datasets/{did}/images/a.jpg/predict",
+               json={"model": "yolo11-detect", "weights": "yolo11s.pt", "render": False})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["image"]["name"] == "a.jpg"
+    assert isinstance(body["items"], list)
+    assert "names" in body and "stored_items" in body
+    assert body["duration_ms"] >= 0
+
+
+def test_predict_requires_model():
+    c = client()
+    pid = c.post("/api/projects", json={"name": "推理2", "id": "apipred2",
+                                        "task": "detect", "classes": ["person"]}).json()["id"]
+    did = c.post(f"/api/projects/{pid}/datasets",
+                 json={"name": "d", "classes": ["person"]}).json()["id"]
+    r = c.post(f"/api/projects/{pid}/datasets/{did}/images/none.jpg/predict",
+               json={"render": False})
+    assert r.status_code == 400
+    assert "model" in r.text
+
+
+def test_predict_upload_rejects_unknown_model():
+    c = client()
+    pid = c.post("/api/projects", json={"name": "推理3", "id": "apipred3",
+                                        "task": "detect", "classes": ["person"]}).json()["id"]
+    r = c.post(f"/api/projects/{pid}/predict",
+               files={"file": ("x.jpg", b"not-an-image", "image/jpeg")},
+               data={"model": "完全不存在的模型"})
+    assert r.status_code in (400, 422), r.text
+
+
+def test_predict_cache_endpoints():
+    c = client()
+    pid = c.post("/api/projects", json={"name": "推理4", "id": "apipred4",
+                                        "task": "detect", "classes": ["person"]}).json()["id"]
+    info = c.get(f"/api/projects/{pid}/predict/cache").json()
+    assert "cached" in info and "limit" in info
+    assert c.delete(f"/api/projects/{pid}/predict/cache").json()["cleared"] is True

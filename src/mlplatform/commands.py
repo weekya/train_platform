@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from . import config, evaluation as evalmod, jobs as jobsmod, logs, paths, runner as runnermod
@@ -30,6 +31,17 @@ __all__ = [
     "start_evaluate_job",
     "parse_selections",
 ]
+
+
+def _reject_inference_only_weights(ref: str, where: str) -> None:
+    """导出版型（onnx/engine/…）只能推理：训练和 mAP 评估都不支持，建作业时就拒。"""
+    from .models_store import INFERENCE_ONLY_SUFFIXES
+
+    suffix = Path(str(ref or "")).suffix.lower()
+    if suffix in INFERENCE_ONLY_SUFFIXES:
+        raise CommandError(
+            f"{where}不能用导出格式（{suffix}）的权重：这类文件只能做推理/标注，"
+            f"没有训练器和验证器。请用训练产出的 .pt，或改去「自动标注」用它")
 
 
 def _reject_unimplemented_task(task: str, where: str) -> None:
@@ -328,6 +340,7 @@ def start_train_job(
     if not model:
         raise CommandError("请选择训练模型")
     # 提前校验模型和类别，把错误挡在排队之前（下载交给 worker）
+    _reject_inference_only_weights(model, "训练")
     model_info = prepare_model_ref(project, model)
     # 能力位前置校验：只标注的实现（sam-segment / vlm-remote）不许排队训练，
     # 否则用户要等作业跑起来才看到错误。
@@ -390,6 +403,7 @@ def start_evaluate_job(
 ) -> dict[str, Any]:
     ds = Dataset(project, dataset)
     _reject_unimplemented_task(ds.task, "评估")
+    _reject_inference_only_weights(weights, "评估")
     weights_info = prepare_model_ref(project, weights)
     if str(weights).lower().endswith((".yaml", ".yml")):
         raise CommandError("评估需要一个训练好的权重文件（.pt），不能用架构 yaml")
